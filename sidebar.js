@@ -5,12 +5,11 @@
   window.__captionPromptSidebar = true;
 
   const {
-    DEFAULT_PROMPT,
-    DEFAULT_TEMPLATE_NAME,
     TARGETS,
     composeText,
     isExtensionContextError,
     textFingerprint,
+    withDefaultTemplates,
     withLaunchHash
   } = globalThis.CaptionPromptShared;
   const {
@@ -920,13 +919,10 @@
   async function loadSettings() {
     const { launcherSettings = {} } = await getLocalStorage('launcherSettings');
     if (extensionContextInvalid) return;
-    templates = Array.isArray(launcherSettings.templates) && launcherSettings.templates.length
-      ? launcherSettings.templates
-      : [{
-          id: crypto.randomUUID(),
-          name: DEFAULT_TEMPLATE_NAME,
-          prompt: launcherSettings.prompt || DEFAULT_PROMPT
-        }];
+    templates = withDefaultTemplates(
+      launcherSettings.templates,
+      launcherSettings.prompt
+    );
     activeTemplateId = templates.some(item => item.id === launcherSettings.activeTemplateId)
       ? launcherSettings.activeTemplateId
       : templates[0].id;

@@ -121,6 +121,21 @@ assert.equal(
   shared.composeText('Prompt', 'Captions', 'before'),
   'Prompt\n\n---\n\n字幕内容：\nCaptions'
 );
+assert.deepEqual(
+  Array.from(shared.withDefaultTemplates(), template => template.name),
+  ['通用字幕问答', 'GPT通用模板']
+);
+assert.deepEqual(
+  Array.from(
+    shared.withDefaultTemplates([{ id: 'custom', name: '自定义', prompt: 'x' }]),
+    template => template.name
+  ),
+  ['自定义', '通用字幕问答', 'GPT通用模板']
+);
+assert.match(
+  shared.withDefaultTemplates().find(template => template.name === 'GPT通用模板').prompt,
+  /## 标题要求/
+);
 const launchUrl = shared.withLaunchHash('https://chatgpt.com/', 'launch-1');
 assert.equal(shared.launchIdFromHash(new URL(launchUrl).hash), 'launch-1');
 

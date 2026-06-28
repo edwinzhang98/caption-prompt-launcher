@@ -1,10 +1,9 @@
 'use strict';
 
 const {
-  DEFAULT_PROMPT,
-  DEFAULT_TEMPLATE_NAME,
   TARGETS,
   composeText,
+  withDefaultTemplates,
   withLaunchHash
 } = globalThis.CaptionPromptShared;
 const {
@@ -247,16 +246,10 @@ function queueSave() {
 async function loadSettings() {
   const { launcherSettings = {} } = await chrome.storage.local.get('launcherSettings');
 
-  if (Array.isArray(launcherSettings.templates) && launcherSettings.templates.length) {
-    templates = launcherSettings.templates;
-  } else {
-    templates = [
-      createTemplate(
-        DEFAULT_TEMPLATE_NAME,
-        launcherSettings.prompt ?? DEFAULT_PROMPT
-      )
-    ];
-  }
+  templates = withDefaultTemplates(
+    launcherSettings.templates,
+    launcherSettings.prompt
+  );
 
   activeTemplateId = templates.some(
     template => template.id === launcherSettings.activeTemplateId
@@ -388,7 +381,7 @@ elements.useCaption.addEventListener('click', () => {
 });
 
 loadSettings().catch(() => {
-  templates = [createTemplate(DEFAULT_TEMPLATE_NAME, DEFAULT_PROMPT)];
+  templates = withDefaultTemplates();
   activeTemplateId = templates[0].id;
   displayActiveTemplate();
   updateTargetUI();
