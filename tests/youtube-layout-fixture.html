@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN" data-caption-fixture="youtube-watch">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>YouTube layout fixture</title>
+    <style>
+      body {
+        margin: 0;
+        background: #f7f7f7;
+        font: 14px Arial, sans-serif;
+      }
+      ytd-watch-flexy {
+        display: block;
+        padding: 32px;
+      }
+      #columns {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(360px, 460px);
+        gap: 24px;
+        max-width: 1500px;
+        margin: auto;
+      }
+      #player-container-inner {
+        height: 560px;
+        background: #111;
+      }
+      #movie_player,
+      video {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      #related {
+        min-height: 180px;
+        padding: 18px;
+        border-radius: 8px;
+        background: #fff;
+      }
+      ytd-watch-flexy[theater] #columns {
+        display: block;
+      }
+      ytd-watch-flexy[theater] #secondary {
+        width: min(520px, 100%);
+        margin: 24px 0 0 auto;
+      }
+      #toggleTheater {
+        position: fixed;
+        z-index: 10;
+        bottom: 20px;
+        left: 40px;
+        padding: 10px 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <ytd-watch-flexy>
+      <div id="columns">
+        <main id="primary">
+          <div id="player-container-inner">
+            <div id="movie_player"><video></video></div>
+          </div>
+          <h1>测试视频标题</h1>
+        </main>
+        <aside id="secondary">
+          <div id="related">推荐视频</div>
+        </aside>
+      </div>
+    </ytd-watch-flexy>
+    <button id="toggleTheater" type="button">切换 YouTube 影院模式</button>
+    <script>
+      const track = {
+        id: 'youtube:fixture:zh',
+        source: 'youtube',
+        language: 'zh-CN',
+        label: '中文',
+        cueCount: 2,
+        text: '[00:02] 第一条字幕\n[00:05] 第二条字幕',
+        plainText: '第一条字幕\n第二条字幕',
+        cues: [
+          { startMs: 2000, endMs: 4800, text: '第一条字幕' },
+          { startMs: 5000, endMs: 8000, text: '第二条字幕' }
+        ]
+      };
+      document.querySelector('#toggleTheater').addEventListener('click', () => {
+        document.querySelector('ytd-watch-flexy').toggleAttribute('theater');
+      });
+      if (new URL(location.href).searchParams.has('theater')) {
+        document.querySelector('ytd-watch-flexy').setAttribute('theater', '');
+      }
+      const emptyCaptions = new URL(location.href).searchParams.has('empty');
+      window.chrome = {
+        runtime: {
+          getURL: path => `../${path}`,
+          onMessage: { addListener() {} },
+          sendMessage: async message => {
+            if (message.type === 'GET_CAPTION_TRACKS') {
+              return { ok: true, tracks: emptyCaptions ? [] : [track] };
+            }
+            return { ok: true };
+          }
+        },
+        storage: {
+          local: {
+            get: async () => ({
+              launcherSettings: {
+                templates: [{ id: 'one', name: '总结', prompt: '总结字幕。' }],
+                activeTemplateId: 'one',
+                target: 'aistudio',
+                promptPosition: 'before',
+                autoSend: false
+              }
+            }),
+            set: async () => {}
+          }
+        }
+      };
+    </script>
+    <script src="../sidebar.js"></script>
+  </body>
+</html>

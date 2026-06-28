@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN" data-caption-fixture="youtube-channel">
+  <head>
+    <meta charset="utf-8">
+    <title>YouTube channel fixture</title>
+  </head>
+  <body>
+    <main>
+      <h1>频道主页</h1>
+      <div id="secondary">这个页面即使存在同名容器，也不能注入字幕栏。</div>
+    </main>
+    <script>
+      window.chrome = {
+        runtime: {
+          getURL: path => `../${path}`,
+          onMessage: { addListener() {} },
+          sendMessage: async () => ({ ok: true, tracks: [] })
+        },
+        storage: {
+          local: {
+            get: async () => ({}),
+            set: async () => {}
+          }
+        }
+      };
+    </script>
+    <script src="../sidebar.js"></script>
+  </body>
+</html>

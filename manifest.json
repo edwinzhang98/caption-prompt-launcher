@@ -1,0 +1,91 @@
+{
+  "manifest_version": 3,
+  "name": "Caption Prompt Launcher",
+  "version": "0.8.4",
+  "description": "Extract video captions, combine them with prompt templates, and send them to AI chat websites.",
+  "permissions": [
+    "clipboardWrite",
+    "downloads",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://*/*",
+    "http://*/*",
+    "https://aistudio.google.com/*",
+    "https://gemini.google.com/*",
+    "https://chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://grok.com/*"
+  ],
+  "action": {
+    "default_title": "Show or hide captions"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.youtube.com/*"
+      ],
+      "js": [
+        "youtube-hook.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://*.youtube.com/*",
+        "https://*.bilibili.com/*"
+      ],
+      "js": [
+        "caption-parsers.js",
+        "shared.js",
+        "transcript-utils.js",
+        "extractor.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://*.youtube.com/*",
+        "https://*.bilibili.com/*"
+      ],
+      "js": [
+        "shared.js",
+        "transcript-utils.js",
+        "sidebar.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://aistudio.google.com/*",
+        "https://gemini.google.com/*",
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://grok.com/*"
+      ],
+      "js": [
+        "shared.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "sidebar.css"
+      ],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ]
+    }
+  ]
+}

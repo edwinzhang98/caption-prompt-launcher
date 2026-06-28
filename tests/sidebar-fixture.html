@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-CN" data-caption-fixture="bilibili-video">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sidebar fixture</title>
+    <style>
+      body {
+        min-height: 100vh;
+        margin: 0;
+        background: linear-gradient(135deg, #eef3f9, #dce7f4);
+      }
+      .fixture-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        gap: 24px;
+        padding: 40px;
+      }
+      video {
+        width: 100%;
+        height: min(620px, 60vw);
+        background: #111;
+      }
+      .right-column {
+        min-width: 0;
+      }
+      #danmukuBox,
+      .recommendation {
+        margin-bottom: 12px;
+        border-radius: 7px;
+        padding: 16px;
+        background: #fff;
+      }
+      #advancePlayback,
+      #continuePlayback,
+      #toggleWide {
+        position: fixed;
+        z-index: 10;
+        bottom: 20px;
+        padding: 10px 14px;
+      }
+      #advancePlayback {
+        left: 40px;
+      }
+      #continuePlayback {
+        left: 210px;
+      }
+      #toggleWide {
+        left: 390px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="fixture-layout">
+      <div class="bpx-player-container" data-screen="normal">
+        <div id="bilibili-player"><video></video></div>
+      </div>
+      <aside class="right-column">
+        <div id="danmukuBox">弹幕列表</div>
+        <div class="recommendation">推荐视频 1</div>
+        <div class="recommendation">推荐视频 2</div>
+      </aside>
+    </div>
+    <button id="advancePlayback" type="button">模拟播放到 01:30</button>
+    <button id="continuePlayback" type="button">继续播放到 01:39</button>
+    <button id="toggleWide" type="button">切换 B站宽屏</button>
+    <script>
+      const sampleTrack = {
+        id: 'fixture:zh',
+        source: 'bilibili',
+        language: 'zh-CN',
+        label: '中文（自动生成）',
+        cueCount: 5,
+        text: '[00:03] 这是第一段测试字幕。\n[00:07] 字幕会自动显示在右侧。\n[00:12] 这些短句在 TS 模式中会继续合并。\n[00:18] 直到形成便于阅读和复制的完整段落。\n[00:25] 下一句话会继续进入同一个段落。',
+        plainText: '这是第一段测试字幕。\n字幕会自动显示在右侧。\n这些短句在 TS 模式中会继续合并。\n直到形成便于阅读和复制的完整段落。\n下一句话会继续进入同一个段落。',
+        cues: [
+          { startMs: 3000, endMs: 6500, text: '这是第一段测试字幕' },
+          { startMs: 7000, endMs: 11000, text: '字幕会自动显示在右侧' },
+          { startMs: 12000, endMs: 17000, text: '这些短句在 TS 模式中会继续合并' },
+          { startMs: 18000, endMs: 24000, text: '直到形成便于阅读和复制的完整段落' },
+          { startMs: 25000, endMs: 30000, text: '下一句话会继续进入同一个段落' }
+        ]
+      };
+      for (let index = 5; index < 40; index += 1) {
+        const startMs = index * 3000;
+        const sentence = `这是用于测试自动滚动的第 ${index + 1} 句字幕`;
+        sampleTrack.cues.push({
+          startMs,
+          endMs: startMs + 2800,
+          text: sentence
+        });
+        sampleTrack.text += `\n[${String(Math.floor(startMs / 60000)).padStart(2, '0')}:${String(Math.floor(startMs / 1000) % 60).padStart(2, '0')}] ${sentence}`;
+        sampleTrack.plainText += `\n${sentence}`;
+      }
+      sampleTrack.cueCount = sampleTrack.cues.length;
+      const englishTrack = {
+        id: 'fixture:en',
+        source: 'bilibili',
+        language: 'en-US',
+        label: 'English',
+        cueCount: 2,
+        text: '[00:02] First English caption\n[00:05] Second English caption',
+        plainText: 'First English caption\nSecond English caption',
+        cues: [
+          { startMs: 2000, endMs: 4800, text: 'First English caption' },
+          { startMs: 5000, endMs: 8000, text: 'Second English caption' }
+        ]
+      };
+      window.fixtureMessages = [];
+      document.querySelector('#advancePlayback').addEventListener('click', () => {
+        const video = document.querySelector('video');
+        video.currentTime = 90;
+        video.dispatchEvent(new Event('timeupdate'));
+      });
+      document.querySelector('#continuePlayback').addEventListener('click', () => {
+        const video = document.querySelector('video');
+        video.currentTime = 99;
+        video.dispatchEvent(new Event('timeupdate'));
+      });
+      document.querySelector('#toggleWide').addEventListener('click', () => {
+        const player = document.querySelector('.bpx-player-container');
+        player.dataset.screen = player.dataset.screen === 'normal' ? 'web' : 'normal';
+      });
+      window.chrome = {
+        runtime: {
+          getURL: path => `../${path}`,
+          onMessage: { addListener() {} },
+          sendMessage: async message => {
+            window.fixtureMessages.push(message);
+            if (message.type === 'CREATE_LAUNCH_TASK') {
+              document.documentElement.dataset.lastLaunchPayload =
+                JSON.stringify(message.payload);
+            }
+            if (message.type === 'GET_CAPTION_TRACKS') {
+              return { ok: true, tracks: [sampleTrack, englishTrack] };
+            }
+            return { ok: true };
+          }
+        },
+        storage: {
+          local: {
+            get: async () => ({
+              launcherSettings: {
+                templates: [
+                  {
+                    id: 'one',
+                    name: '总结',
+                    prompt: '请总结下面的字幕，并列出关键观点。'
+                  },
+                  {
+                    id: 'two',
+                    name: '提取行动项',
+                    prompt: '请提取所有行动项。'
+                  }
+                ],
+                activeTemplateId: 'one',
+                target: 'aistudio',
+                promptPosition: 'before',
+                autoSend: false
+              }
+            }),
+            set: async () => {}
+          }
+        }
+      };
+    </script>
+    <script src="../sidebar.js"></script>
+  </body>
+</html>
