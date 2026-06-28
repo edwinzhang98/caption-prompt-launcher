@@ -19,6 +19,7 @@ yarn-debug.log*
 yarn-error.log*
 .env
 .env.*
+DEVELOPMENT_NOTES.md
 
 # Editor and OS metadata
 .idea/

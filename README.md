@@ -1,37 +1,21 @@
 # Caption Prompt Launcher
 
-A local-first Chrome extension for capturing video captions, reading them in a sidebar, and sending the transcript to AI chat tools with reusable prompt templates.
+Caption Prompt Launcher is a Chrome extension for capturing video captions and sending transcripts to AI chat tools with reusable prompt templates.
 
-The extension currently focuses on YouTube and Bilibili videos. It does not use a backend server, cloud transcription, or paid AI APIs for caption extraction.
+It runs locally in the browser and currently supports caption capture on YouTube and Bilibili video pages.
 
 ## Features
 
-- Captures captions from YouTube and Bilibili video pages.
-- Shows a vCaptions-style embedded sidebar on supported video pages.
-- Supports two transcript views:
-  - `CC`: caption lines with timestamps.
-  - `TS`: cleaner paragraph-style text generated locally with rule-based merging and punctuation.
-- Click any caption line or TS sentence to jump to that point in the video.
-- Highlights the currently playing caption and provides a `Back to Current` button after manual scrolling.
-- Copies or downloads captions as `TXT`, `Markdown`, `SRT`, `WebVTT`, or `JSON`.
-- Saves multiple prompt templates locally.
-- Sends the current TS transcript to:
-  - Google AI Studio
-  - Gemini
-  - NotebookLM
-  - ChatGPT
-  - Claude
-  - Grok
-
-## How It Works
-
-Caption Prompt Launcher runs entirely in the browser.
-
-For YouTube, it monitors caption-related network responses and player caption tracks. For Bilibili, it queries the official player subtitle endpoints using the current page session. Captured captions are stored in Chrome session storage for the current tab, then rendered in the sidebar.
-
-The `TS` view is generated locally with deterministic rules. It does not call NLTK, an LLM, or any remote summarization service.
-
-Prompt launching uses a one-time task ID in the destination URL hash. The target AI page claims that task from local extension storage and fills the input box with the prepared text. This avoids relying on whatever happens to be in the clipboard.
+- Capture captions from supported video pages.
+- View captions in an embedded sidebar.
+- Switch between two transcript modes:
+  - `CC`: timestamped caption lines.
+  - `TS`: paragraph-style transcript text generated locally.
+- Click a caption line or sentence to jump to the matching video timestamp.
+- Highlight the currently playing caption while the video plays.
+- Copy or download transcripts as `TXT`, `Markdown`, `SRT`, `WebVTT`, or `JSON`.
+- Save multiple prompt templates locally.
+- Send the current transcript to AI tools such as AI Studio, Gemini, ChatGPT, Claude, Grok, and NotebookLM.
 
 ## Installation
 
@@ -39,26 +23,26 @@ Prompt launching uses a one-time task ID in the destination URL hash. The target
 2. Enable **Developer mode**.
 3. Click **Load unpacked**.
 4. Select this project folder.
-5. Refresh any already-open YouTube or Bilibili video tabs.
+5. Refresh any already-open supported video pages.
 
 ## Usage
 
 1. Open a supported YouTube or Bilibili video page.
-2. The caption sidebar appears automatically when captions are detected.
-3. Choose a caption track if multiple languages are available.
-4. Use `CC` for timestamped caption lines or `TS` for cleaner paragraph text.
-5. Use `Copy`, `Download`, or open the `Prompt` tab to send the transcript to an AI tool.
+2. Wait for the caption sidebar to appear.
+3. Select a caption track if multiple tracks are available.
+4. Use `CC` for timestamped captions or `TS` for paragraph-style transcript text.
+5. Use `Copy`, `Download`, or the `Prompt` tab to send the transcript to an AI tool.
 
-Clicking the extension icon toggles the sidebar on supported video pages.
+Click the extension icon to show or hide the sidebar on supported video pages.
 
 ## Supported Sites
 
-Caption extraction and sidebar:
+Caption capture:
 
 - YouTube video pages
 - Bilibili video pages
 
-Prompt destination pages:
+Prompt destinations:
 
 - Google AI Studio
 - Gemini
@@ -67,21 +51,24 @@ Prompt destination pages:
 - Claude
 - Grok
 
-The sidebar is intentionally not injected into AI chat websites.
-
 ## Privacy
 
 - Captions and prompt templates are stored locally in Chrome extension storage.
 - The extension does not run a backend server.
-- Captions are only sent to the AI website you choose.
-- NotebookLM mode copies the transcript and opens NotebookLM, because NotebookLM expects sources rather than a normal chat prompt.
+- Captions are only sent to the AI tool you choose.
+- The `TS` transcript is generated locally with rule-based text processing.
 
 ## Development
 
-Run the lightweight checks:
+Run syntax checks:
 
 ```bash
 node --check shared.js transcript-utils.js sidebar.js popup.js content.js background.js extractor.js tests/caption-parsers.test.js
+```
+
+Run tests:
+
+```bash
 node tests/caption-parsers.test.js
 ```
 
@@ -92,29 +79,14 @@ Main files:
 - `sidebar.js`: embedded caption sidebar UI.
 - `content.js`: text insertion on AI destination pages.
 - `background.js`: task routing, caption cache, downloads, and tab actions.
-- `shared.js`: shared prompt/target/launch helpers.
-- `transcript-utils.js`: caption formatting, TS generation, and download payloads.
+- `shared.js`: shared prompt, target, and launch helpers.
+- `transcript-utils.js`: transcript formatting and download payloads.
 - `caption-parsers.js`: caption parser utilities.
-
-For more implementation notes from the early development process, see [`DEVELOPMENT_NOTES.md`](DEVELOPMENT_NOTES.md).
 
 ## Limitations
 
-- It does not include vCaptions features such as translation, chapters, cloud ASR, or AI summaries.
-- Some Bilibili captions require login; requests use the current browser session.
-- Sites that render captions only through canvas, DRM overlays, or custom live DOM without caption files may not be capturable.
-- AI websites often change their input box DOM, so destination filling rules may need updates.
-- Auto-send is experimental because each AI website handles synthetic keyboard events differently.
-- The extension currently opens a new AI tab instead of reusing an existing one.
-
-## Name Ideas
-
-The current working name is **Caption Prompt Launcher**. Other possible names:
-
-- **CaptionBridge**: short, product-like, emphasizes moving captions into AI tools.
-- **SubPrompt**: compact and memorable, but a little less explicit.
-- **Transcript Bridge**: clear and professional, broader than captions.
-- **Caption Courier**: friendly, emphasizes delivery.
-- **Prompt Captions**: plain and searchable.
-
-I currently lean toward **CaptionBridge** if you want a cleaner GitHub/product name, and **Caption Prompt Launcher** if you want the name to explain the function immediately.
+- Caption availability depends on the source website exposing caption data.
+- Some Bilibili captions may require the user to be logged in.
+- Websites that render captions only through canvas, DRM overlays, or custom live DOM may not be capturable.
+- AI destination pages may change their input box structure, so text insertion rules may need updates over time.
+- Auto-send is experimental because each AI website handles synthetic input events differently.
