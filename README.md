@@ -19,11 +19,34 @@ It runs locally in the browser and currently supports caption capture on YouTube
 
 ## Installation
 
+Clone the repository:
+
+```bash
+git clone https://github.com/edwinzhang98/caption-prompt-launcher.git
+cd caption-prompt-launcher
+```
+
+Then load it in Chrome:
+
 1. Open `chrome://extensions`.
 2. Enable **Developer mode**.
 3. Click **Load unpacked**.
 4. Select this project folder.
 5. Refresh any already-open supported video pages.
+
+On macOS, you can open the Chrome extensions page from Terminal:
+
+```bash
+open -a "Google Chrome" chrome://extensions
+```
+
+Chrome does not provide a normal one-command permanent install flow for unpacked extensions. The `Load unpacked` step is still required.
+
+If you are using an AI coding agent, you can give it this prompt:
+
+```text
+Clone https://github.com/edwinzhang98/caption-prompt-launcher.git, inspect the README, and help me load the unpacked Chrome extension locally. Do not publish, package, or modify the extension unless I explicitly ask.
+```
 
 ## Usage
 
