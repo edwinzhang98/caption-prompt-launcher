@@ -2,6 +2,7 @@
 
 const TASK_TTL_MS = 5 * 60 * 1000;
 const CAPTION_CACHE_PREFIX = 'captionCache:';
+const LAUNCH_TASK_PREFIX = 'launchTask:';
 
 chrome.action.onClicked.addListener(async tab => {
   if (!tab.id) return;
@@ -61,22 +62,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }).catch(() => {});
   }
 
-  if (message?.type === 'CREATE_LAUNCH_TASK') {
-    createTask(message.payload)
-      .then(launchId => sendResponse({ ok: true, launchId }))
-      .catch(error => sendResponse({ ok: false, error: error.message }));
-    return true;
-  }
-
-  if (message?.type === 'OPEN_TARGET_TAB') {
-    chrome.tabs.create({ url: message.url })
-      .then(tab => sendResponse({ ok: true, tabId: tab.id }))
+  if (message?.type === 'LAUNCH_TARGET') {
+    launchTarget(message.url, message.payload)
+      .then(tabId => sendResponse({ ok: true, tabId }))
       .catch(error => sendResponse({ ok: false, error: error.message }));
     return true;
   }
 
   if (message?.type === 'CLAIM_LAUNCH_TASK') {
-    claimTask(message.targetId, message.launchId)
+    claimTask(sender.tab?.id, message.targetId)
       .then(task => sendResponse({ ok: true, task }))
       .catch(error => sendResponse({ ok: false, error: error.message }));
     return true;
@@ -89,6 +83,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 chrome.tabs.onRemoved.addListener(tabId => {
   chrome.storage.session.remove(captionCacheKey(tabId)).catch(() => {});
+  chrome.storage.session.remove(launchTaskKey(tabId)).catch(() => {});
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
@@ -211,66 +206,53 @@ async function scanCaptions(tabId) {
   }
 }
 
-async function createTask(payload) {
-  if (!payload?.targetId || !payload?.text) {
-    throw new Error('Launch task payload is incomplete.');
-  }
-
-  const id = crypto.randomUUID();
-  await chrome.storage.local.set({
-    pendingLaunchTask: {
-      id,
-      targetId: payload.targetId,
-      text: payload.text,
-      sourceTrackId: payload.sourceTrackId || '',
-      sourceVideoId: payload.sourceVideoId || '',
-      sourcePageUrl: payload.sourcePageUrl || '',
-      sourcePreview: payload.sourcePreview || '',
-      fingerprint: payload.fingerprint || '',
-      autoSend: Boolean(payload.autoSend),
-      createdAt: Date.now()
-    }
-  });
-  return id;
+function launchTaskKey(tabId) {
+  return `${LAUNCH_TASK_PREFIX}${tabId}`;
 }
 
-async function claimTask(targetId, launchId) {
-  if (!launchId) return null;
-  const { pendingLaunchTask } = await chrome.storage.local.get('pendingLaunchTask');
-  if (!pendingLaunchTask) return null;
+async function launchTarget(url, payload) {
+  if (!url) throw new Error('Missing target url.');
 
-  const expired = Date.now() - pendingLaunchTask.createdAt > TASK_TTL_MS;
-  const wrongTarget = pendingLaunchTask.targetId !== targetId;
-  const wrongLaunch = pendingLaunchTask.id !== launchId;
-  if (expired) {
-    await chrome.storage.local.remove('pendingLaunchTask');
-    return null;
+  // 先开标签页，拿到它唯一的 tabId，再把任务按 tabId 存进 session。
+  // 这样 content.js 只需用自己的 sender.tab.id 就能精准取回任务，
+  // 不依赖 URL hash（不怕被 SPA 洗掉），也不会和别的标签页串槽。
+  const tab = await chrome.tabs.create({ url });
+
+  if (payload?.text) {
+    await chrome.storage.session.set({
+      [launchTaskKey(tab.id)]: {
+        id: crypto.randomUUID(),
+        targetId: payload.targetId || '',
+        text: payload.text,
+        autoSend: Boolean(payload.autoSend),
+        createdAt: Date.now()
+      }
+    });
   }
-  if (wrongTarget || wrongLaunch) return null;
 
-  await chrome.storage.local.remove('pendingLaunchTask');
-  return pendingLaunchTask;
+  return tab.id;
+}
+
+async function claimTask(tabId, targetId) {
+  if (!tabId) return null;
+  const key = launchTaskKey(tabId);
+  const stored = await chrome.storage.session.get(key);
+  const task = stored[key];
+  if (!task) return null;
+
+  await chrome.storage.session.remove(key);
+  if (Date.now() - task.createdAt > TASK_TTL_MS) return null;
+  if (targetId && task.targetId && task.targetId !== targetId) return null;
+  return task;
 }
 
 async function reportResult(message) {
   const key = message.ok ? 'lastLaunchSuccess' : 'lastLaunchError';
-  const update = {
+  await chrome.storage.local.set({
     [key]: {
       targetId: message.targetId,
       detail: message.detail || '',
       at: Date.now()
     }
-  };
-
-  if (message.ok && message.taskId) {
-    const { pendingLaunchTask } = await chrome.storage.local.get('pendingLaunchTask');
-    if (pendingLaunchTask?.id === message.taskId) {
-      update.pendingLaunchTask = null;
-    }
-  }
-
-  await chrome.storage.local.set(update);
-  if (update.pendingLaunchTask === null) {
-    await chrome.storage.local.remove('pendingLaunchTask');
-  }
+  });
 }

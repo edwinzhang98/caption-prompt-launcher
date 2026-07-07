@@ -94,7 +94,7 @@ const context = {
 };
 vm.createContext(context);
 vm.runInContext(`${fs.readFileSync(require.resolve('../background.js'), 'utf8')}
-  globalThis.__test = { captionCacheKey, filterTracksForUrl, createTask, claimTask };
+  globalThis.__test = { captionCacheKey, filterTracksForUrl, launchTarget, claimTask };
 `, context);
 assert.deepEqual(context.__test.filterTracksForUrl([
   { source: 'youtube', videoId: 'old-video', text: 'old' },
@@ -102,10 +102,11 @@ assert.deepEqual(context.__test.filterTracksForUrl([
 ], 'https://www.youtube.com/watch?v=new-video'), [
   { source: 'youtube', videoId: 'new-video', text: 'new' }
 ]);
-const launchId = await context.__test.createTask({ targetId: 'chatgpt', text: 'fresh', autoSend: false });
-assert.equal(await context.__test.claimTask('chatgpt'), null);
-assert.equal((await context.__test.claimTask('chatgpt', launchId)).text, 'fresh');
-assert.equal(await context.__test.claimTask('chatgpt', launchId), null);
+const launchTabId = await context.__test.launchTarget('https://chatgpt.com/', { targetId: 'chatgpt', text: 'fresh', autoSend: false });
+assert.equal(await context.__test.claimTask(undefined), null);
+assert.equal(await context.__test.claimTask(999, 'chatgpt'), null);
+assert.equal((await context.__test.claimTask(launchTabId, 'chatgpt')).text, 'fresh');
+assert.equal(await context.__test.claimTask(launchTabId, 'chatgpt'), null);
 
 const browserContext = {
   URL,

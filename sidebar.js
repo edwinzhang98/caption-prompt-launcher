@@ -1301,7 +1301,6 @@
     try {
       const targetId = selectedTarget();
       const target = TARGETS[targetId];
-      let launchUrl = target.url;
       const text = target.sourceOnly
         ? captions
         : composeText(elements.prompt.value, captions, elements.promptPosition.value, {
@@ -1310,27 +1309,17 @@
       await saveSettings();
       if (target.sourceOnly) {
         await navigator.clipboard.writeText(text);
-      } else {
-        const response = await sendRuntimeMessage({
-          type: 'CREATE_LAUNCH_TASK',
-          payload: {
-            targetId,
-            text,
-            sourceTrackId: track?.id || '',
-            sourceVideoId: track?.videoId || '',
-            sourcePageUrl: track?.pageUrl || location.href,
-            sourcePreview: transcript.slice(0, 160),
-            fingerprint: textFingerprint(text),
-            autoSend: elements.autoSend.checked
-          }
-        });
-        if (extensionContextInvalid) return;
-        if (!response?.ok) throw new Error(response?.error || 'Failed to create launch task.');
-        launchUrl = withLaunchHash(target.url, response.launchId);
       }
       const opened = await sendRuntimeMessage({
-        type: 'OPEN_TARGET_TAB',
-        url: launchUrl
+        type: 'LAUNCH_TARGET',
+        url: target.url,
+        payload: target.sourceOnly
+          ? null
+          : {
+              targetId,
+              text,
+              autoSend: elements.autoSend.checked
+            }
       });
       if (extensionContextInvalid) return;
       if (!opened?.ok) throw new Error(opened?.error || 'Failed to open target site.');

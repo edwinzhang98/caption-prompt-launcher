@@ -1,9 +1,5 @@
 'use strict';
 
-const {
-  launchIdFromHash
-} = globalThis.CaptionPromptShared;
-
 const SITE_CONFIGS = {
   'aistudio.google.com': {
     id: 'aistudio',
@@ -72,42 +68,67 @@ const SITE_CONFIGS = {
 
 const config = SITE_CONFIGS[location.hostname];
 
+let pendingTask = null;
+let filledOnce = false;
+let fillingNow = false;
+
 if (config) {
-  run().catch(error => {
-    report(false, error.message);
-  });
+  start().catch(error => report(false, error.message));
 }
 
-async function run() {
-  const launchId = launchIdFromHash();
-  if (!launchId) return;
+async function start() {
+  pendingTask = await claimForThisTab();
+  if (!pendingTask) return;
 
-  const response = await chrome.runtime.sendMessage({
-    type: 'CLAIM_LAUNCH_TASK',
-    targetId: config.id,
-    launchId
-  });
-
-  if (!response?.ok || !response.task) return;
-  const text = response.task.text || '';
-
-  const editor = await waitForEditor(config.selectors, 30_000);
-  if (!editor) {
-    throw new Error('在 30 秒内没有找到可输入的对话框。');
+  await tryFill();
+  // 若这次没填成（多半是标签页在后台、SPA 还没渲染输入框），
+  // 等标签页下次变可见时再补填，直到成功。
+  if (!filledOnce) {
+    document.addEventListener('visibilitychange', onVisibilityChange);
   }
+}
 
-  const filled = await fillEditor(editor, text);
-  if (!filled) throw new Error('找到了输入框，但没有成功填入文本。');
-
-  if (response.task.autoSend) {
-    await submit(editor, config.sendSelectors);
+async function claimForThisTab() {
+  // 任务由 background 按本标签页的 tabId 存好；重试几次以防偶发的抢跑。
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'CLAIM_LAUNCH_TASK',
+        targetId: config.id
+      });
+      if (response?.ok && response.task) return response.task;
+    } catch {}
+    await sleep(200);
   }
+  return null;
+}
 
-  report(
-    true,
-    response.task.autoSend ? '已填入并尝试发送' : '已填入',
-    response.task.id
-  );
+function onVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    tryFill().catch(error => report(false, error.message));
+  }
+}
+
+async function tryFill() {
+  if (filledOnce || fillingNow || !pendingTask) return;
+  fillingNow = true;
+  try {
+    const editor = await waitForEditor(config.selectors, 30_000);
+    if (!editor) return; // 还没准备好，留给下次变可见时重试
+
+    const ok = await fillEditor(editor, pendingTask.text || '');
+    if (!ok) return;
+
+    filledOnce = true;
+    if (pendingTask.autoSend) {
+      await submit(editor, config.sendSelectors);
+    }
+    report(true, pendingTask.autoSend ? '已填入并尝试发送' : '已填入', pendingTask.id);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    pendingTask = null;
+  } finally {
+    fillingNow = false;
+  }
 }
 
 async function waitForEditor(selectors, timeoutMs) {

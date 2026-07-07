@@ -297,7 +297,6 @@ async function launch() {
 
     const targetId = selectedTarget();
     const target = TARGETS[targetId];
-    let launchUrl = target.url;
     const text = target.sourceOnly
       ? payloadText
       : composeText(
@@ -311,9 +310,11 @@ async function launch() {
 
     if (target.sourceOnly) {
       await navigator.clipboard.writeText(text);
+      await chrome.tabs.create({ url: target.url });
     } else {
       const response = await chrome.runtime.sendMessage({
-        type: 'CREATE_LAUNCH_TASK',
+        type: 'LAUNCH_TARGET',
+        url: target.url,
         payload: {
           targetId,
           text,
@@ -322,12 +323,9 @@ async function launch() {
       });
 
       if (!response?.ok) {
-        throw new Error(response?.error || 'Failed to create launch task.');
+        throw new Error(response?.error || 'Failed to open target site.');
       }
-      launchUrl = withLaunchHash(target.url, response.launchId);
     }
-
-    await chrome.tabs.create({ url: launchUrl });
     showMessage(`Opening ${target.label}...`, true);
     setTimeout(() => window.close(), 350);
   } catch (error) {
