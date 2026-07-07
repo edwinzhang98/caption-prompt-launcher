@@ -268,19 +268,21 @@ function normalizeText(text) {
 }
 
 async function submit(editor, selectors) {
-  await sleep(350);
-
-  for (const selector of selectors || []) {
-    const button = [...document.querySelectorAll(selector)].find(element => {
-      const rect = element.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0 && !element.disabled;
-    });
+  // 填入长文本后，ChatGPT 等站点可能把内容转成“附件”并有上传/处理过程，
+  // 这期间发送按钮是 disabled。所以要轮询等按钮真正可用再点，
+  // 而不是等固定 350ms 只找一次（那一下按钮多半还是灰的）。
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline) {
+    const button = findEnabledSendButton(selectors);
     if (button) {
       button.click();
-      return;
+      return true;
     }
+    await sleep(300);
   }
 
+  // 兜底：始终没等到可用的发送按钮时，才尝试模拟 Enter
+  // （多数站点只认可信按键事件，成功率低，仅作最后手段）。
   const options = {
     key: 'Enter',
     code: 'Enter',
@@ -293,6 +295,23 @@ async function submit(editor, selectors) {
   editor.dispatchEvent(new KeyboardEvent('keydown', options));
   editor.dispatchEvent(new KeyboardEvent('keypress', options));
   editor.dispatchEvent(new KeyboardEvent('keyup', options));
+  return false;
+}
+
+function findEnabledSendButton(selectors) {
+  for (const selector of selectors || []) {
+    const button = [...document.querySelectorAll(selector)].find(element => {
+      const rect = element.getBoundingClientRect();
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        !element.disabled &&
+        element.getAttribute('aria-disabled') !== 'true'
+      );
+    });
+    if (button) return button;
+  }
+  return null;
 }
 
 function sleep(ms) {
