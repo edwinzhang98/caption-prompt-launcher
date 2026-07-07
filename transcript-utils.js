@@ -2,6 +2,7 @@
   'use strict';
 
   const DOWNLOAD_FORMATS = ['txt', 'md', 'srt', 'vtt', 'json'];
+  const DESCRIPTION_LIMIT = 12_000;
 
   function trackCues(track) {
     if (Array.isArray(track?.cues) && track.cues.length) return track.cues;
@@ -95,6 +96,53 @@
     return transcriptFor(track, cache).text;
   }
 
+  function videoInfoFor(track, options = {}) {
+    const trackInfo = track?.videoInfo || {};
+    const optionInfo = options.videoInfo || {};
+    const info = {
+      ...trackInfo,
+      ...optionInfo
+    };
+    return {
+      title: cleanInfoValue(info.title || track?.title || track?.pageTitle || options.title),
+      author: cleanInfoValue(info.author || track?.author || options.author),
+      url: cleanInfoValue(info.url || track?.pageUrl || options.pageUrl),
+      description: cleanDescription(info.description || track?.description || options.description)
+    };
+  }
+
+  function formatVideoInfoText(track, options = {}) {
+    const info = videoInfoFor(track, options);
+    const lines = [];
+    if (info.title) lines.push(`Title: ${info.title}`);
+    if (info.author) lines.push(`Author: ${info.author}`);
+    if (info.url) lines.push(`URL: ${info.url}`);
+    if (info.description) {
+      lines.push('Description:');
+      lines.push(info.description);
+    }
+    return lines.length ? ['Video Info:', ...lines].join('\n') : '';
+  }
+
+  function transcriptPackageText(track, options = {}) {
+    return textPackageWithVideoInfo(
+      track,
+      plainParagraphText(track, options.cache),
+      {
+        ...options,
+        bodyLabel: options.bodyLabel || 'Transcript'
+      }
+    );
+  }
+
+  function textPackageWithVideoInfo(track, bodyText, options = {}) {
+    const transcript = String(bodyText || '').trim();
+    const info = formatVideoInfoText(track, options);
+    const bodyLabel = options.bodyLabel || 'Transcript';
+    const body = transcript ? `${bodyLabel}:\n${transcript}` : '';
+    return [info, body].filter(Boolean).join('\n\n');
+  }
+
   function removeTimestamps(text) {
     return String(text || '').replace(/^\[[^\]]+\]\s*/gm, '');
   }
@@ -121,8 +169,9 @@
 
   function createDownloadPayload(track, format, options = {}) {
     const safeFormat = DOWNLOAD_FORMATS.includes(format) ? format : 'txt';
+    const info = videoInfoFor(track, options);
     const baseName = safeFilename([
-      track?.pageTitle || options.title || 'captions',
+      info.title || track?.pageTitle || options.title || 'captions',
       track?.language || track?.label || ''
     ].filter(Boolean).join(' - '));
     return {
@@ -134,11 +183,13 @@
 
   function formatDownloadContent(track, format, options = {}) {
     const cues = trackCues(track);
-    if (format === 'srt') return cuesToSrt(cues);
-    if (format === 'vtt') return `WEBVTT\n\n${cuesToVtt(cues)}`;
+    if (format === 'srt') return `${metadataNote(track, options)}${cuesToSrt(cues)}`;
+    if (format === 'vtt') return `WEBVTT\n\n${metadataNote(track, options)}${cuesToVtt(cues)}`;
     if (format === 'json') {
+      const info = videoInfoFor(track, options);
       return JSON.stringify({
-        title: track?.pageTitle || options.title || '',
+        videoInfo: info,
+        title: info.title,
         source: track?.source || '',
         language: track?.language || '',
         label: track?.label || '',
@@ -147,21 +198,34 @@
         cues
       }, null, 2);
     }
-    const transcript = plainParagraphText(track, options.cache);
     if (format === 'md') {
+      const info = videoInfoFor(track, options);
       return [
-        `# ${track?.pageTitle || options.title || 'Captions'}`,
+        `# ${info.title || track?.pageTitle || options.title || 'Captions'}`,
         '',
+        '## Video Info',
+        '',
+        `- Title: ${info.title || ''}`,
+        `- Author: ${info.author || ''}`,
+        `- URL: ${info.url || ''}`,
         `- Source: ${track?.source || 'unknown'}`,
         `- Language: ${track?.label || track?.language || 'unknown'}`,
-        `- URL: ${track?.pageUrl || options.pageUrl || ''}`,
+        '',
+        '### Description',
+        '',
+        info.description || '',
         '',
         '## Transcript',
         '',
-        transcript
+        plainParagraphText(track, options.cache)
       ].join('\n');
     }
-    return transcript;
+    return transcriptPackageText(track, options);
+  }
+
+  function metadataNote(track, options = {}) {
+    const info = formatVideoInfoText(track, options);
+    return info ? `NOTE\n${info}\n\n` : '';
   }
 
   function cuesToSrt(cues) {
@@ -212,14 +276,35 @@
       .slice(0, 140) || 'captions';
   }
 
+  function cleanInfoValue(value) {
+    return String(value || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function cleanDescription(value) {
+    return String(value || '')
+      .replace(/\r/g, '')
+      .split('\n')
+      .map(line => cleanInfoValue(line))
+      .filter(Boolean)
+      .join('\n')
+      .slice(0, DESCRIPTION_LIMIT)
+      .trim();
+  }
+
   globalThis.CaptionPromptTranscript = {
     DOWNLOAD_FORMATS,
     captionRows,
     createDownloadPayload,
+    formatVideoInfoText,
     formatDisplayTime,
     plainParagraphText,
     removeTimestamps,
     trackCues,
-    transcriptFor
+    transcriptFor,
+    transcriptPackageText,
+    textPackageWithVideoInfo,
+    videoInfoFor
   };
 })();

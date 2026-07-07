@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,71 +11,80 @@
       <header class="header">
         <div>
           <p class="eyebrow">CAPTION LAUNCHER</p>
-          <h1>把字幕送去 AI</h1>
+          <h1>Send Captions to AI</h1>
         </div>
-        <span class="status-dot" title="所有设置仅保存在本机"></span>
+        <span class="status-dot" title="Settings are stored locally only"></span>
       </header>
 
-      <nav class="view-tabs" aria-label="功能切换">
-        <button class="view-tab active" type="button" data-view="captions">获取字幕</button>
-        <button class="view-tab" type="button" data-view="launcher">Prompt 转发</button>
+      <nav class="view-tabs" aria-label="View switcher">
+        <button class="view-tab active" type="button" data-view="captions">Captions</button>
+        <button class="view-tab" type="button" data-view="launcher">Prompt</button>
       </nav>
 
       <section id="captionsView" class="view-panel">
         <div class="caption-heading">
           <div>
-            <span class="label">当前页面字幕</span>
-            <p id="captionStatus" class="caption-status">正在扫描当前页面…</p>
+            <span class="label">Current Page Captions</span>
+            <p id="captionStatus" class="caption-status">Scanning current page...</p>
           </div>
-          <button id="refreshCaptions" class="icon-button text-button" type="button">重新扫描</button>
+          <button id="refreshCaptions" class="icon-button text-button" type="button">Rescan</button>
         </div>
 
         <div id="captionTracks" class="caption-tracks"></div>
 
         <div id="captionEmpty" class="caption-empty">
-          <strong>还没有捕获到字幕</strong>
-          <span>YouTube 请先播放视频或打开一次字幕；Bilibili 会自动查询官方字幕。</span>
+          <strong>No captions captured yet</strong>
+          <span>Play the video or turn captions on once. Bilibili captions are queried automatically.</span>
         </div>
 
         <textarea
           id="captionPreview"
           class="caption-preview"
           readonly
-          placeholder="捕获到字幕后会显示在这里。"
+          placeholder="Captured captions will appear here."
         ></textarea>
 
         <div class="caption-actions">
-          <button id="copyCaption" class="secondary-action" type="button" disabled>复制字幕</button>
-          <button id="useCaption" class="primary-action" type="button" disabled>使用此字幕 →</button>
+          <button id="copyCaption" class="secondary-action" type="button" disabled>Copy</button>
+          <button id="useCaption" class="primary-action" type="button" disabled>Use This →</button>
         </div>
       </section>
 
       <section id="launcherView" class="view-panel" hidden>
       <section class="section">
         <div class="template-header">
-          <span class="label template-label">Prompt 模板</span>
+          <span class="label template-label">Prompt Templates</span>
           <div class="template-actions">
-            <button id="renameTemplate" class="icon-button text-button" type="button">重命名</button>
-            <button id="deleteTemplate" class="icon-button" type="button" title="删除当前模板">−</button>
+            <button id="copyTemplate" class="icon-button text-button" type="button">Copy</button>
+            <button id="renameTemplate" class="icon-button text-button" type="button">Rename</button>
+            <button id="deleteTemplate" class="icon-button" type="button" title="Delete current template">−</button>
           </div>
         </div>
-        <div id="templateList" class="template-list" aria-label="Prompt 模板"></div>
+        <div id="templateList" class="template-list" aria-label="Prompt templates"></div>
         <textarea
           id="prompt"
           rows="6"
-          placeholder="例如：请总结下面的视频字幕，列出关键观点，并保留重要时间戳。"
+          placeholder="Example: summarize the transcript, list key points, and preserve important timestamps."
         ></textarea>
         <div class="row compact">
-          <span class="hint">自动保存</span>
-          <span id="promptCount" class="hint">0 字</span>
+          <span class="hint">Autosaved</span>
+          <span id="promptCount" class="hint">0 chars</span>
         </div>
       </section>
 
       <section class="section">
-        <span class="label">发送到</span>
-        <div class="targets" role="radiogroup" aria-label="目标网站">
+        <span class="label">Send To</span>
+        <div class="targets" role="radiogroup" aria-label="Target site">
           <label class="target">
-            <input type="radio" name="target" value="aistudio" checked>
+            <input type="radio" name="target" value="chatgpt" checked>
+            <span>ChatGPT</span>
+          </label>
+          <label class="target">
+            <input type="radio" name="target" value="claude">
+            <span>Claude</span>
+          </label>
+          <label class="target">
+            <input type="radio" name="target" value="aistudio">
             <span>AI Studio</span>
           </label>
           <label class="target">
@@ -85,14 +94,6 @@
           <label class="target">
             <input type="radio" name="target" value="notebooklm">
             <span>NotebookLM</span>
-          </label>
-          <label class="target">
-            <input type="radio" name="target" value="chatgpt">
-            <span>ChatGPT</span>
-          </label>
-          <label class="target">
-            <input type="radio" name="target" value="claude">
-            <span>Claude</span>
           </label>
           <label class="target">
             <input type="radio" name="target" value="grok">
@@ -105,31 +106,31 @@
       <section class="settings">
         <label class="setting">
           <span>
-            <strong>Prompt 位置</strong>
-            <small>放在字幕之前或之后</small>
+            <strong>Prompt Position</strong>
+            <small>Place it before or after the transcript</small>
           </span>
           <select id="promptPosition">
-            <option value="before">字幕之前</option>
-            <option value="after">字幕之后</option>
+            <option value="before">Before transcript</option>
+            <option value="after">After transcript</option>
           </select>
         </label>
 
         <label class="setting">
           <span>
-            <strong>填入后自动发送</strong>
-            <small>实验功能，默认关闭</small>
+            <strong>Auto-send after filling</strong>
+            <small>Experimental, off by default</small>
           </span>
           <input id="autoSend" class="switch" type="checkbox">
         </label>
       </section>
 
       <button id="launch" class="launch" type="button">
-        <span>使用当前字幕并打开</span>
+        <span>Open with Current Transcript</span>
         <span aria-hidden="true">→</span>
       </button>
 
       <p id="message" class="message" role="status"></p>
-      <p class="privacy">字幕只会发送到你选择的网站，不经过额外服务器。</p>
+      <p class="privacy">Captions are sent only to the site you choose. No extra server is used.</p>
       </section>
     </main>
 

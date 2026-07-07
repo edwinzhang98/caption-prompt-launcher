@@ -19,8 +19,14 @@
     formatDisplayTime,
     plainParagraphText,
     trackCues,
-    transcriptFor
+    transcriptFor,
+    transcriptPackageText,
+    textPackageWithVideoInfo,
+    videoInfoFor
   } = globalThis.CaptionPromptTranscript;
+  const {
+    collectVideoInfo
+  } = globalThis.CaptionPromptVideoInfo;
 
   const host = document.createElement('div');
   host.id = 'caption-prompt-sidebar-host';
@@ -37,24 +43,25 @@
     <header class="header">
       <strong>Captions</strong>
       <nav class="tabs">
-        <button class="tab active" data-view="captions" type="button">字幕</button>
+        <button class="tab active" data-view="captions" type="button">Captions</button>
+        <button class="tab" data-view="info" type="button">Info</button>
         <button class="tab" data-view="prompt" type="button">Prompt</button>
       </nav>
-      <button class="close-button" type="button" title="隐藏">⌃</button>
+      <button class="close-button" type="button" title="Hide">⌃</button>
     </header>
     <section class="view captions-view">
       <div class="caption-tools">
-        <select class="track-select" aria-label="字幕轨道"></select>
+        <select class="track-select" aria-label="Caption track"></select>
         <div class="mode-group">
           <button class="mode-button" data-mode="cc" type="button">CC</button>
           <button class="mode-button active" data-mode="ts" type="button">TS</button>
         </div>
-        <button class="tool-button copy-button" type="button" disabled>复制</button>
-        <button class="tool-button download-toggle" type="button" disabled>下载</button>
+        <button class="tool-button copy-button" type="button" disabled>Copy</button>
+        <button class="tool-button download-toggle" type="button" disabled>Download</button>
       </div>
       <div class="download-panel" hidden>
         <div class="download-row">
-          <span class="download-label">格式</span>
+          <span class="download-label">Format</span>
           <div class="download-format-options">
             <button class="download-format active" data-format="txt" type="button">TXT</button>
             <button class="download-format" data-format="md" type="button">Markdown</button>
@@ -63,52 +70,76 @@
             <button class="download-format" data-format="json" type="button">JSON</button>
           </div>
         </div>
-        <label>
-          <span>更改保存位置</span>
-          <input class="download-save-as" type="checkbox">
-        </label>
-        <button class="download-button" type="button">下载字幕</button>
-        <div class="download-path">首次下载会弹出保存位置选择框。</div>
+        <div class="folder-row">
+          <button class="folder-button" type="button">Choose Folder</button>
+          <button class="folder-button folder-default" type="button">Use Default</button>
+          <span class="folder-name">Save location: Default downloads folder</span>
+        </div>
+        <button class="download-button" type="button">Download Captions</button>
       </div>
-      <div class="caption-meta">正在自动查找当前页面的字幕</div>
+      <div class="caption-meta">Looking for captions on this page...</div>
       <main class="caption-content">
-        <div class="empty">打开包含字幕的视频后，这里会自动显示字幕。</div>
+        <div class="empty">Open a video with captions and they will appear here automatically.</div>
         <ol class="caption-list" hidden></ol>
       </main>
       <button class="back-current-button" type="button" hidden>Back to Current</button>
     </section>
+    <section class="view info-view" hidden>
+      <div class="info-content">
+        <div class="info-empty">Select a captured caption track to view the title, author, URL, and description.</div>
+        <dl class="video-info-list" hidden>
+          <div>
+            <dt>Title</dt>
+            <dd class="video-info-title"></dd>
+          </div>
+          <div>
+            <dt>Author</dt>
+            <dd class="video-info-author"></dd>
+          </div>
+          <div>
+            <dt>URL</dt>
+            <dd><a class="video-info-url" target="_blank" rel="noreferrer"></a></dd>
+          </div>
+          <div>
+            <dt>Description</dt>
+            <dd class="video-info-description"></dd>
+          </div>
+        </dl>
+      </div>
+    </section>
     <section class="view prompt-view" hidden>
       <div class="prompt-scroll">
         <div class="section-heading">
-          <strong>Prompt 模板</strong>
+          <strong>Prompt Templates</strong>
           <div>
-            <button class="small-button rename-template" type="button">重命名</button>
-            <button class="small-button delete-template" type="button">删除</button>
+            <button class="small-button copy-template" type="button">Copy</button>
+            <button class="small-button rename-template" type="button">Rename</button>
+            <button class="small-button delete-template" type="button">Delete</button>
           </div>
         </div>
         <div class="template-list"></div>
         <textarea class="prompt-editor" rows="7"></textarea>
         <div class="prompt-count"></div>
-        <strong class="field-label">发送到</strong>
+        <strong class="field-label">Send To</strong>
         <div class="targets"></div>
         <div class="settings">
           <label>
-            <span>Prompt 位置</span>
+            <span>Prompt Position</span>
             <select class="prompt-position">
-              <option value="before">字幕之前</option>
-              <option value="after">字幕之后</option>
+              <option value="before">Before transcript</option>
+              <option value="after">After transcript</option>
             </select>
           </label>
           <label>
-            <span>填入后自动发送</span>
+            <span>Auto-send after filling</span>
             <input class="auto-send" type="checkbox">
           </label>
         </div>
-        <button class="launch-button" type="button">使用当前字幕（TS）并打开 AI</button>
+        <button class="launch-button" type="button">Open AI with current transcript (TS)</button>
         <div class="launch-message"></div>
       </div>
     </section>
-    <footer class="status">等待字幕...</footer>
+    <footer class="status">Waiting for captions...</footer>
   `;
   shadow.append(stylesheet, panel);
 
@@ -122,16 +153,24 @@
     downloadToggle: shadow.querySelector('.download-toggle'),
     downloadPanel: shadow.querySelector('.download-panel'),
     downloadFormats: [...shadow.querySelectorAll('.download-format')],
-    downloadSaveAs: shadow.querySelector('.download-save-as'),
+    chooseFolder: shadow.querySelector('.folder-button'),
+    useDefaultFolder: shadow.querySelector('.folder-default'),
+    folderName: shadow.querySelector('.folder-name'),
     downloadButton: shadow.querySelector('.download-button'),
-    downloadPath: shadow.querySelector('.download-path'),
     meta: shadow.querySelector('.caption-meta'),
     content: shadow.querySelector('.caption-content'),
     empty: shadow.querySelector('.empty'),
     list: shadow.querySelector('.caption-list'),
     backCurrent: shadow.querySelector('.back-current-button'),
+    infoEmpty: shadow.querySelector('.info-empty'),
+    videoInfoList: shadow.querySelector('.video-info-list'),
+    videoInfoTitle: shadow.querySelector('.video-info-title'),
+    videoInfoAuthor: shadow.querySelector('.video-info-author'),
+    videoInfoUrl: shadow.querySelector('.video-info-url'),
+    videoInfoDescription: shadow.querySelector('.video-info-description'),
     status: shadow.querySelector('.status'),
     templateList: shadow.querySelector('.template-list'),
+    copyTemplate: shadow.querySelector('.copy-template'),
     renameTemplate: shadow.querySelector('.rename-template'),
     deleteTemplate: shadow.querySelector('.delete-template'),
     prompt: shadow.querySelector('.prompt-editor'),
@@ -156,6 +195,7 @@
   let templates = [];
   let activeTemplateId = '';
   let downloadSettings = {};
+  let downloadDirectoryHandle;
   let saveTimer = 0;
   let playbackFrame = 0;
   let mountFrame = 0;
@@ -179,6 +219,7 @@
   elements.track.addEventListener('change', () => {
     selectedTrackId = elements.track.value;
     renderCaptions();
+    renderVideoInfo();
   });
   elements.modes.forEach(button => button.addEventListener('click', () => {
     mode = button.dataset.mode;
@@ -192,7 +233,8 @@
     setDownloadFormat(button.dataset.format);
     queueSave();
   }));
-  elements.downloadSaveAs.addEventListener('change', queueSave);
+  elements.chooseFolder.addEventListener('click', chooseDownloadFolder);
+  elements.useDefaultFolder.addEventListener('click', clearDownloadFolder);
   elements.backCurrent.addEventListener('click', resumePlaybackFollow);
   elements.content.addEventListener('wheel', pausePlaybackFollow, { passive: true });
   elements.content.addEventListener('touchmove', pausePlaybackFollow, { passive: true });
@@ -212,11 +254,13 @@
     ));
   }, { passive: true });
   elements.prompt.addEventListener('input', () => {
-    const template = activeTemplate();
-    if (template) template.prompt = elements.prompt.value;
-    elements.promptCount.textContent = `${elements.prompt.value.length} 字`;
+    syncActiveTemplateFromEditor();
+    elements.promptCount.textContent = `${elements.prompt.value.length} chars`;
     queueSave();
   });
+  elements.prompt.addEventListener('keydown', stopEditorEventPropagation);
+  elements.prompt.addEventListener('keyup', stopEditorEventPropagation);
+  elements.copyTemplate.addEventListener('click', copyTemplate);
   elements.renameTemplate.addEventListener('click', renameTemplate);
   elements.deleteTemplate.addEventListener('click', deleteTemplate);
   elements.promptPosition.addEventListener('change', queueSave);
@@ -274,6 +318,61 @@
       if (handleExtensionError(error)) return false;
       throw error;
     }
+  }
+
+  async function loadDownloadDirectoryHandle() {
+    if (!supportsDirectoryDownloads()) return undefined;
+    try {
+      return await getDownloadHandleStore('readonly', store => store.get('downloadDirectory'));
+    } catch {
+      return undefined;
+    }
+  }
+
+  async function saveDownloadDirectoryHandle(handle) {
+    if (!supportsDirectoryDownloads()) return false;
+    try {
+      await getDownloadHandleStore('readwrite', store => store.put(handle, 'downloadDirectory'));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function deleteDownloadDirectoryHandle() {
+    if (!supportsDirectoryDownloads()) return false;
+    try {
+      await getDownloadHandleStore('readwrite', store => store.delete('downloadDirectory'));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function getDownloadHandleStore(mode, operation) {
+    const db = await openDownloadHandleDb();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction('handles', mode);
+      const request = operation(transaction.objectStore('handles'));
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+      transaction.oncomplete = () => db.close();
+      transaction.onabort = () => {
+        db.close();
+        reject(transaction.error);
+      };
+    });
+  }
+
+  function openDownloadHandleDb() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('caption-prompt-launcher', 1);
+      request.onupgradeneeded = () => {
+        request.result.createObjectStore('handles');
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
   }
 
   function fixtureSite() {
@@ -424,7 +523,7 @@
     folded = nextFolded;
     panel.classList.toggle('folded', folded);
     elements.close.textContent = folded ? '⌄' : '⌃';
-    elements.close.title = folded ? '展开' : '收起';
+    elements.close.title = folded ? 'Expand' : 'Collapse';
     updateEmbeddedHeight();
   }
 
@@ -529,7 +628,7 @@
     try {
       const response = await sendRuntimeMessage({ type: 'GET_CAPTION_TRACKS' });
       if (extensionContextInvalid) return;
-      if (!response?.ok) throw new Error(response?.error || '字幕读取失败');
+      if (!response?.ok) throw new Error(response?.error || 'Failed to read captions.');
       tracks = response.tracks || [];
       if (!tracks.some(track => track.id === selectedTrackId)) {
         selectedTrackId = tracks[0]?.id || '';
@@ -537,6 +636,7 @@
       updateFoldForCaptionAvailability(tracks.length > 0);
       renderTrackOptions();
       renderCaptions();
+      renderVideoInfo();
     } catch (error) {
       if (handleExtensionError(error)) return;
       setStatus(error.message, 'error');
@@ -552,13 +652,13 @@
   function renderTrackOptions() {
     elements.track.replaceChildren();
     if (!tracks.length) {
-      elements.track.append(new Option('暂无字幕', ''));
+      elements.track.append(new Option('No captions', ''));
       elements.track.disabled = true;
       return;
     }
     elements.track.disabled = false;
     tracks.forEach(track => {
-      elements.track.append(new Option(track.label || track.language || '字幕', track.id));
+      elements.track.append(new Option(track.label || track.language || 'Captions', track.id));
     });
     elements.track.value = selectedTrackId;
   }
@@ -567,18 +667,31 @@
     return tracks.find(track => track.id === selectedTrackId);
   }
 
+  function selectedExportTrack() {
+    const track = selectedTrack();
+    if (!track) return undefined;
+    const videoInfo = currentVideoInfo(track);
+    return {
+      ...track,
+      pageTitle: videoInfo.title || track.pageTitle || document.title,
+      pageUrl: videoInfo.url || track.pageUrl || location.href,
+      videoInfo
+    };
+  }
+
   function renderCaptions() {
     const track = selectedTrack();
     elements.copy.disabled = !track;
     elements.downloadToggle.disabled = !track;
     elements.list.replaceChildren();
     if (!track) {
-      elements.meta.textContent = '正在自动查找当前页面的字幕';
+      elements.meta.textContent = 'Looking for captions on this page...';
       elements.empty.hidden = false;
       elements.list.hidden = true;
       elements.backCurrent.hidden = true;
       elements.downloadPanel.hidden = true;
-      setStatus('等待字幕...');
+      renderVideoInfo();
+      setStatus('Waiting for captions...');
       return;
     }
     const cues = trackCues(track);
@@ -586,15 +699,51 @@
       ? captionRows(cues, track.text)
       : transcriptFor(track, transcriptCache).paragraphs;
     elements.meta.textContent =
-      `${track.label || track.language || '字幕'} · ${track.cueCount || rows.length} 段`;
+      `${track.label || track.language || 'Captions'} · ${track.cueCount || rows.length} segments`;
     rows.forEach(row => elements.list.append(
       mode === 'cc' ? createCaptionRow(row) : createParagraphRow(row)
     ));
     elements.empty.hidden = Boolean(rows.length);
     elements.list.hidden = !rows.length;
-    setStatus(mode === 'cc' ? 'CC：带时间戳字幕' : 'TS：分段纯文本');
+    setStatus(mode === 'cc' ? 'CC: timestamped captions' : 'TS: paragraph transcript');
     currentPlaybackStartMs = -1;
     schedulePlaybackSync();
+  }
+
+  function renderVideoInfo() {
+    const track = selectedTrack();
+    const info = currentVideoInfo(track);
+    const hasInfo = Boolean(info.title || info.author || info.url || info.description);
+    elements.infoEmpty.hidden = hasInfo;
+    elements.videoInfoList.hidden = !hasInfo;
+    if (!hasInfo) return;
+
+    setTextOrPlaceholder(elements.videoInfoTitle, info.title);
+    setTextOrPlaceholder(elements.videoInfoAuthor, info.author);
+    elements.videoInfoUrl.textContent = info.url || 'Not available';
+    elements.videoInfoUrl.href = info.url || location.href;
+    setTextOrPlaceholder(elements.videoInfoDescription, info.description);
+  }
+
+  function setTextOrPlaceholder(element, value) {
+    element.textContent = value || 'Not available';
+    element.classList.toggle('muted', !value);
+  }
+
+  function currentVideoInfo(track = {}) {
+    const domInfo = collectVideoInfo(track);
+    return videoInfoFor({
+      ...track,
+      title: domInfo.title || track.title || track.pageTitle || document.title,
+      pageUrl: domInfo.url || track.pageUrl || location.href,
+      videoInfo: {
+        ...(track.videoInfo || {}),
+        ...domInfo
+      }
+    }, {
+      title: document.title,
+      pageUrl: location.href
+    });
   }
 
   function createCaptionRow(row) {
@@ -647,7 +796,7 @@
     elements.backCurrent.hidden = true;
     video.currentTime = Math.max(0, Number(startMs) / 1000);
     syncPlaybackHighlight(true);
-    setStatus(`已定位到 ${formatDisplayTime(startMs)}`, 'success');
+    setStatus(`Jumped to ${formatDisplayTime(startMs)}`, 'success');
   }
 
   function schedulePlaybackSync() {
@@ -759,17 +908,34 @@
     return plainParagraphText(track, transcriptCache);
   }
 
+  function currentCopyText() {
+    const track = selectedExportTrack();
+    if (!track) return '';
+    const text = mode === 'cc'
+      ? track.text
+      : plainParagraphText(track, transcriptCache);
+    return textPackageWithVideoInfo(track, text, {
+      cache: transcriptCache,
+      bodyLabel: mode === 'cc' ? 'Captions' : 'Transcript'
+    });
+  }
+
   function currentTranscriptText() {
     const track = selectedTrack();
     return track ? plainParagraphText(track, transcriptCache) : '';
   }
 
+  function currentPromptPayloadText() {
+    const track = selectedExportTrack();
+    return track ? transcriptPackageText(track, { cache: transcriptCache }) : '';
+  }
+
   async function copyCurrentText() {
     try {
-      await navigator.clipboard.writeText(currentText());
-      setStatus('字幕已复制', 'success');
+      await navigator.clipboard.writeText(currentCopyText());
+      setStatus('Copied', 'success');
     } catch {
-      setStatus('复制失败，请检查剪贴板权限', 'error');
+      setStatus('Copy failed. Please check clipboard permission.', 'error');
     }
   }
 
@@ -788,52 +954,195 @@
     });
   }
 
+  function supportsDirectoryDownloads() {
+    return typeof window.showDirectoryPicker === 'function' &&
+      typeof window.indexedDB !== 'undefined';
+  }
+
+  function updateDownloadModeUI() {
+    const supported = supportsDirectoryDownloads();
+    elements.chooseFolder.disabled = !supported;
+    if (!supported) {
+      elements.folderName.textContent = 'Save location: Default downloads folder';
+      return;
+    }
+    elements.folderName.textContent = downloadDirectoryHandle
+      ? `Save location: ${downloadDirectoryHandle.name}`
+      : 'Save location: Default downloads folder';
+  }
+
+  async function chooseDownloadFolder() {
+    if (!supportsDirectoryDownloads()) {
+      setStatus('Folder access is not supported by this browser or page.', 'error');
+      return undefined;
+    }
+    try {
+      const handle = await window.showDirectoryPicker({
+        id: 'caption-prompt-downloads',
+        mode: 'readwrite',
+        startIn: downloadDirectoryHandle || 'downloads'
+      });
+      await ensureDirectoryPermission(handle);
+      downloadDirectoryHandle = handle;
+      const remembered = await saveDownloadDirectoryHandle(handle);
+      updateDownloadModeUI();
+      setStatus(
+        remembered
+          ? `Folder selected: ${handle.name}`
+          : `Folder selected for this page only: ${handle.name}`,
+        remembered ? 'success' : 'error'
+      );
+      return handle;
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        setStatus(error.message || 'Failed to choose folder.', 'error');
+      }
+      return undefined;
+    }
+  }
+
+  async function clearDownloadFolder() {
+    // 切回"默认下载文件夹"模式：清掉记住的目录句柄，之后 downloadCurrentTrack
+    // 会走 triggerBlobDownload，把文件下到浏览器默认下载目录（~/Downloads）。
+    // 这是唯一能存进 Downloads 根目录的方式——File System Access API 禁止选 Downloads。
+    downloadDirectoryHandle = undefined;
+    await deleteDownloadDirectoryHandle();
+    updateDownloadModeUI();
+    setStatus('Switched to default downloads folder (~/Downloads).', 'success');
+  }
+
+  async function currentDownloadDirectory() {
+    if (!supportsDirectoryDownloads()) return undefined;
+    const handle = downloadDirectoryHandle || await loadDownloadDirectoryHandle();
+    if (!handle) return undefined;
+    await ensureDirectoryPermission(handle);
+    downloadDirectoryHandle = handle;
+    updateDownloadModeUI();
+    return handle;
+  }
+
+  async function ensureDirectoryPermission(handle) {
+    const options = { mode: 'readwrite' };
+    if ((await handle.queryPermission?.(options)) === 'granted') return true;
+    if ((await handle.requestPermission?.(options)) === 'granted') return true;
+    throw new Error('Folder permission was not granted.');
+  }
+
   async function downloadCurrentTrack() {
-    const track = selectedTrack();
+    const track = selectedExportTrack();
     if (!track) {
-      setStatus('还没有可下载的字幕。', 'error');
+      setStatus('No captions to download yet.', 'error');
       return;
     }
     elements.downloadButton.disabled = true;
     try {
       const format = selectedDownloadFormat();
+      const directoryHandle = await currentDownloadDirectory();
       const payload = createDownloadPayload(track, format, {
-        cache: transcriptCache,
-        pageUrl: location.href,
-        title: document.title
+        cache: transcriptCache
       });
-      const saveAs = elements.downloadSaveAs.checked || !downloadSettings.lastDownloadPath;
-      const response = await sendRuntimeMessage({
-        type: 'DOWNLOAD_CAPTION_FILE',
-        payload: {
-          ...payload,
-          saveAs
-        }
-      });
-      if (extensionContextInvalid) return;
-      if (!response?.ok) throw new Error(response?.error || '下载失败');
+      if (directoryHandle) {
+        const filename = await writePayloadToDirectory(directoryHandle, payload);
+        downloadSettings = {
+          ...downloadSettings,
+          format,
+          lastDownloadPath: `${directoryHandle.name}/${filename}`
+        };
+        queueSave();
+        return;
+      }
+      const savedFilename = triggerBlobDownload(payload);
       downloadSettings = {
         ...downloadSettings,
         format,
-        saveAs: elements.downloadSaveAs.checked,
-        lastDownloadPath: response.filename || ''
+        lastDownloadPath: savedFilename
       };
-      elements.downloadSaveAs.checked = false;
-      elements.downloadPath.textContent = response.filename
-        ? `上次保存：${response.filename}`
-        : '下载已开始。';
       queueSave();
-      setStatus('字幕下载已开始', 'success');
     } catch (error) {
       if (handleExtensionError(error)) return;
-      setStatus(error.message || '下载失败', 'error');
+      setStatus(error.message || 'Download failed.', 'error');
     } finally {
       elements.downloadButton.disabled = false;
     }
   }
 
+  function triggerBlobDownload(payload) {
+    // 默认下载路径：直接在页面上下文里用 blob + <a download> 触发浏览器原生下载，
+    // 存到浏览器默认下载目录（macOS 通常是 ~/Downloads）。
+    // 之所以不走 background service worker：SW 没有 DOM、也没有 URL.createObjectURL，
+    // 只能用 data: URL 调 chrome.downloads，对长字幕不可靠。content script 有完整 DOM，
+    // blob 与页面同源，download 属性才会生效。
+    const filename = sanitizeLocalFilename(basenameFromDownloadPath(payload.filename));
+    const blob = new Blob([payload.content], {
+      type: payload.mimeType || 'text/plain;charset=utf-8'
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.rel = 'noopener';
+    anchor.style.display = 'none';
+    document.body.appendChild(anchor);
+    anchor.click();
+    setTimeout(() => {
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    }, 1000);
+    return filename;
+  }
+
+  async function writePayloadToDirectory(directoryHandle, payload) {
+    const filename = await availableFilename(
+      directoryHandle,
+      basenameFromDownloadPath(payload.filename)
+    );
+    const fileHandle = await directoryHandle.getFileHandle(filename, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(new Blob([payload.content], {
+      type: payload.mimeType || 'text/plain;charset=utf-8'
+    }));
+    await writable.close();
+    return filename;
+  }
+
+  async function availableFilename(directoryHandle, filename) {
+    const safeName = sanitizeLocalFilename(filename || 'captions.txt');
+    const extensionMatch = safeName.match(/(\.[^.]+)$/);
+    const extension = extensionMatch?.[1] || '';
+    const stem = extension ? safeName.slice(0, -extension.length) : safeName;
+    for (let index = 0; index < 100; index += 1) {
+      const candidate = index ? `${stem} (${index})${extension}` : safeName;
+      try {
+        await directoryHandle.getFileHandle(candidate);
+      } catch {
+        return candidate;
+      }
+    }
+    return `${stem} (${Date.now()})${extension}`;
+  }
+
+  function basenameFromDownloadPath(value) {
+    return String(value || 'captions.txt').split('/').filter(Boolean).pop() || 'captions.txt';
+  }
+
+  function sanitizeLocalFilename(value) {
+    return String(value || 'captions.txt')
+      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
+      .replace(/\s+/g, ' ')
+      .trim() || 'captions.txt';
+  }
+
   function activeTemplate() {
     return templates.find(template => template.id === activeTemplateId) || templates[0];
+  }
+
+  function syncActiveTemplateFromEditor() {
+    const template = activeTemplate();
+    if (template) template.prompt = elements.prompt.value;
+  }
+
+  function stopEditorEventPropagation(event) {
+    event.stopPropagation();
   }
 
   function renderTemplates() {
@@ -845,6 +1154,7 @@
       button.classList.toggle('active', template.id === activeTemplateId);
       button.textContent = template.name;
       button.addEventListener('click', () => {
+        syncActiveTemplateFromEditor();
         activeTemplateId = template.id;
         displayTemplate();
         queueSave();
@@ -858,7 +1168,7 @@
     add.addEventListener('click', () => {
       const template = {
         id: crypto.randomUUID(),
-        name: `模板 ${templates.length + 1}`,
+        name: `Template ${templates.length + 1}`,
         prompt: ''
       };
       templates.push(template);
@@ -875,17 +1185,30 @@
     const template = activeTemplate();
     if (!template) return;
     elements.prompt.value = template.prompt;
-    elements.promptCount.textContent = `${template.prompt.length} 字`;
+    elements.promptCount.textContent = `${template.prompt.length} chars`;
     renderTemplates();
   }
 
   function renameTemplate() {
+    syncActiveTemplateFromEditor();
     const template = activeTemplate();
-    const name = window.prompt('模板名称', template?.name || '')?.trim();
+    const name = window.prompt('Template name', template?.name || '')?.trim();
     if (!template || !name) return;
     template.name = name;
     renderTemplates();
     queueSave();
+  }
+
+  async function copyTemplate() {
+    syncActiveTemplateFromEditor();
+    try {
+      await navigator.clipboard.writeText(elements.prompt.value);
+      elements.launchMessage.textContent = 'Template copied.';
+      elements.launchMessage.classList.add('success');
+    } catch {
+      elements.launchMessage.textContent = 'Copy failed. Please check clipboard permission.';
+      elements.launchMessage.classList.remove('success');
+    }
   }
 
   function deleteTemplate() {
@@ -913,7 +1236,7 @@
   }
 
   function selectedTarget() {
-    return shadow.querySelector('input[name="caption-launch-target"]:checked')?.value || 'aistudio';
+    return shadow.querySelector('input[name="caption-launch-target"]:checked')?.value || 'chatgpt';
   }
 
   async function loadSettings() {
@@ -930,11 +1253,9 @@
     elements.autoSend.checked = Boolean(launcherSettings.autoSend);
     downloadSettings = launcherSettings.downloadSettings || {};
     setDownloadFormat(downloadSettings.format || 'txt');
-    elements.downloadSaveAs.checked = Boolean(downloadSettings.saveAs || !downloadSettings.lastDownloadPath);
-    elements.downloadPath.textContent = downloadSettings.lastDownloadPath
-      ? `上次保存：${downloadSettings.lastDownloadPath}`
-      : '首次下载会弹出保存位置选择框。';
-    renderTargets(launcherSettings.target || 'aistudio');
+    downloadDirectoryHandle = await loadDownloadDirectoryHandle();
+    updateDownloadModeUI();
+    renderTargets(launcherSettings.target || 'chatgpt');
     displayTemplate();
   }
 
@@ -943,13 +1264,14 @@
     saveTimer = setTimeout(() => {
       saveSettings().catch(error => {
         if (!handleExtensionError(error)) {
-          setStatus(error.message || '设置保存失败', 'error');
+          setStatus(error.message || 'Failed to save settings.', 'error');
         }
       });
     }, 180);
   }
 
   async function saveSettings() {
+    syncActiveTemplateFromEditor();
     await setLocalStorage({
       launcherSettings: {
         templates,
@@ -958,19 +1280,21 @@
         promptPosition: elements.promptPosition.value,
         autoSend: elements.autoSend.checked,
         downloadSettings: {
-          ...downloadSettings,
           format: selectedDownloadFormat(),
-          saveAs: elements.downloadSaveAs.checked
+          lastDownloadPath: downloadSettings.lastDownloadPath || ''
         }
       }
     });
   }
 
   async function launch() {
-    const captions = currentTranscriptText();
-    const track = selectedTrack();
-    if (!captions) {
-      elements.launchMessage.textContent = '还没有可用字幕。';
+    syncActiveTemplateFromEditor();
+    elements.launchMessage.classList.remove('success');
+    const transcript = currentTranscriptText();
+    const captions = currentPromptPayloadText();
+    const track = selectedExportTrack();
+    if (!transcript) {
+      elements.launchMessage.textContent = 'No captions available yet.';
       return;
     }
     elements.launch.disabled = true;
@@ -980,7 +1304,9 @@
       let launchUrl = target.url;
       const text = target.sourceOnly
         ? captions
-        : composeText(elements.prompt.value, captions, elements.promptPosition.value);
+        : composeText(elements.prompt.value, captions, elements.promptPosition.value, {
+            contentLabel: false
+          });
       await saveSettings();
       if (target.sourceOnly) {
         await navigator.clipboard.writeText(text);
@@ -993,13 +1319,13 @@
             sourceTrackId: track?.id || '',
             sourceVideoId: track?.videoId || '',
             sourcePageUrl: track?.pageUrl || location.href,
-            sourcePreview: captions.slice(0, 160),
+            sourcePreview: transcript.slice(0, 160),
             fingerprint: textFingerprint(text),
             autoSend: elements.autoSend.checked
           }
         });
         if (extensionContextInvalid) return;
-        if (!response?.ok) throw new Error(response?.error || '创建发送任务失败');
+        if (!response?.ok) throw new Error(response?.error || 'Failed to create launch task.');
         launchUrl = withLaunchHash(target.url, response.launchId);
       }
       const opened = await sendRuntimeMessage({
@@ -1007,11 +1333,11 @@
         url: launchUrl
       });
       if (extensionContextInvalid) return;
-      if (!opened?.ok) throw new Error(opened?.error || '无法打开目标网站');
-      elements.launchMessage.textContent = `正在打开 ${target.label}...`;
+      if (!opened?.ok) throw new Error(opened?.error || 'Failed to open target site.');
+      elements.launchMessage.textContent = `Opening ${target.label}...`;
     } catch (error) {
       if (handleExtensionError(error)) return;
-      elements.launchMessage.textContent = error.message || '操作失败';
+      elements.launchMessage.textContent = error.message || 'Operation failed.';
     } finally {
       elements.launch.disabled = false;
     }
@@ -1030,7 +1356,7 @@
   mount();
   loadSettings().catch(error => {
     if (!handleExtensionError(error)) {
-      setStatus(error.message || '设置读取失败', 'error');
+      setStatus(error.message || 'Failed to load settings.', 'error');
     }
   });
   loadTracks();

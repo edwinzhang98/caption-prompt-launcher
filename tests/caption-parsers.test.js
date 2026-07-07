@@ -123,25 +123,75 @@ assert.equal(
 );
 assert.deepEqual(
   Array.from(shared.withDefaultTemplates(), template => template.name),
-  ['通用字幕问答', 'GPT通用模板']
+  ['Summary (bullet points)', 'Summary (article)']
 );
 assert.deepEqual(
   Array.from(
     shared.withDefaultTemplates([{ id: 'custom', name: '自定义', prompt: 'x' }]),
     template => template.name
   ),
-  ['自定义', '通用字幕问答', 'GPT通用模板']
+  ['自定义', 'Summary (bullet points)', 'Summary (article)']
+);
+assert.deepEqual(
+  Array.from(
+    shared.withDefaultTemplates([{ id: 'default-gpt-notes', name: 'GPT通用模板', prompt: 'x' }]),
+    template => template.name
+  ),
+  ['Summary (bullet points)', 'Summary (article)']
+);
+assert.deepEqual(
+  Array.from(
+    shared.withDefaultTemplates([{ id: 'default-gpt-notes', name: 'GPT Universal Template', prompt: 'x' }]),
+    template => template.name
+  ),
+  ['Summary (bullet points)', 'Summary (article)']
+);
+assert.deepEqual(
+  Array.from(
+    shared.withDefaultTemplates([{ id: 'default-gpt-notes', name: 'Default Template', prompt: 'x' }]),
+    template => template.name
+  ),
+  ['Summary (bullet points)', 'Summary (article)']
+);
+assert.deepEqual(
+  Array.from(
+    shared.withDefaultTemplates([{
+      id: 'default-general',
+      name: '通用字幕问答',
+      prompt: '请根据下面的视频字幕回答我的问题。请忽略少量字幕识别错误，回答时尽量保留重要时间戳，并使用中文。'
+    }]),
+    template => template.name
+  ),
+  ['Summary (bullet points)', 'Summary (article)']
 );
 assert.match(
-  shared.withDefaultTemplates().find(template => template.name === 'GPT通用模板').prompt,
+  shared.withDefaultTemplates().find(template => template.name === 'Summary (bullet points)').prompt,
   /## 标题要求/
 );
+assert.match(
+  shared.withDefaultTemplates().find(template => template.name === 'Summary (article)').prompt,
+  /# 正文文章/
+);
+assert.deepEqual(Object.keys(shared.TARGETS), [
+  'chatgpt',
+  'claude',
+  'aistudio',
+  'gemini',
+  'notebooklm',
+  'grok'
+]);
 const launchUrl = shared.withLaunchHash('https://chatgpt.com/', 'launch-1');
 assert.equal(shared.launchIdFromHash(new URL(launchUrl).hash), 'launch-1');
 
 const sampleTrack = {
   pageTitle: 'Demo / Video',
   pageUrl: 'https://www.youtube.com/watch?v=demo',
+  videoInfo: {
+    title: 'Demo Video',
+    author: 'Demo Author',
+    url: 'https://www.youtube.com/watch?v=demo',
+    description: 'Demo description with a guest name.'
+  },
   source: 'youtube',
   videoId: 'demo',
   language: 'zh',
@@ -155,6 +205,16 @@ const sampleTrack = {
 const transcriptCache = new WeakMap();
 assert.equal(transcript.plainParagraphText(sampleTrack, transcriptCache), '你好，世界。最后一句。');
 assert.match(
+  transcript.transcriptPackageText(sampleTrack, { cache: transcriptCache }),
+  /Video Info:\nTitle: Demo Video\nAuthor: Demo Author\nURL: https:\/\/www\.youtube\.com\/watch\?v=demo\nDescription:\nDemo description/
+);
+assert.match(
+  shared.composeText('Prompt', transcript.transcriptPackageText(sampleTrack, {
+    cache: transcriptCache
+  }), 'before', { contentLabel: false }),
+  /Prompt\n\n---\n\nVideo Info:/
+);
+assert.match(
   transcript.createDownloadPayload(sampleTrack, 'srt').content,
   /00:00:01,000 --> 00:00:02,000/
 );
@@ -163,7 +223,7 @@ assert.match(
     cache: transcriptCache,
     pageUrl: sampleTrack.pageUrl
   }).content,
-  /## Transcript/
+  /## Video Info[\s\S]*Demo Author[\s\S]*## Transcript/
 );
 
 console.log('caption parser tests: ok');

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Caption Prompt Launcher",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "description": "Extract video captions, combine them with prompt templates, and send them to AI chat websites.",
   "permissions": [
     "clipboardWrite",
@@ -45,6 +45,7 @@
         "caption-parsers.js",
         "shared.js",
         "transcript-utils.js",
+        "video-info.js",
         "extractor.js"
       ],
       "run_at": "document_start",
@@ -58,6 +59,7 @@
       "js": [
         "shared.js",
         "transcript-utils.js",
+        "video-info.js",
         "sidebar.js"
       ],
       "run_at": "document_idle"

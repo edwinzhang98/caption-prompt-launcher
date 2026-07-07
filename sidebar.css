@@ -201,13 +201,44 @@
 }
 
 .download-row,
-.download-panel label {
+.folder-row {
   min-width: 0;
   display: flex;
   align-items: center;
   gap: 7px;
   color: #bfc2c8;
   font-size: 10px;
+}
+
+.folder-button {
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid #45474d;
+  border-radius: 5px;
+  color: #b9bbc0;
+  background: #292b2f;
+  cursor: pointer;
+  font: 700 10px/1 Arial, "Helvetica Neue", sans-serif;
+}
+
+.folder-button:hover,
+.folder-button:focus-visible {
+  border-color: #398cc8;
+  color: #fff;
+  outline: 0;
+}
+
+.folder-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.folder-name {
+  min-width: 0;
+  overflow: hidden;
+  color: #8f939a;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .download-label {
@@ -251,14 +282,6 @@
   font: 700 10px/1 Arial, "Helvetica Neue", sans-serif;
 }
 
-.download-path {
-  overflow: hidden;
-  color: #8f939a;
-  font-size: 9px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .caption-meta {
   padding: 7px 10px;
   border-bottom: 1px solid #303236;
@@ -271,6 +294,59 @@
   flex: 1;
   overflow: auto;
   scrollbar-color: #50535a #202124;
+}
+
+.info-view {
+  overflow: auto;
+  scrollbar-color: #50535a #202124;
+}
+
+.info-content {
+  padding: 12px;
+}
+
+.video-info-list {
+  margin: 0;
+}
+
+.video-info-list > div {
+  padding: 10px 0;
+  border-bottom: 1px solid #303236;
+}
+
+.video-info-list > div:first-child {
+  padding-top: 0;
+}
+
+.video-info-list dt {
+  margin: 0 0 5px;
+  color: #8f939a;
+  font-size: 10px;
+}
+
+.video-info-list dd {
+  margin: 0;
+  color: #d6d8dc;
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.video-info-list a {
+  color: #67b7ed;
+  text-decoration: none;
+}
+
+.video-info-list a:hover,
+.video-info-list a:focus-visible {
+  color: #9ed7ff;
+  text-decoration: underline;
+  outline: 0;
+}
+
+.video-info-list .muted {
+  color: #777b82;
 }
 
 .back-current-button {
@@ -371,7 +447,8 @@
   box-shadow: none;
 }
 
-.empty {
+.empty,
+.info-empty {
   padding: 56px 24px;
   color: #8e9299;
   font-size: 12px;
@@ -540,6 +617,10 @@
 .launch-message {
   color: #d7a961;
   text-align: left;
+}
+
+.launch-message.success {
+  color: #58d57b;
 }
 
 .status {

@@ -13,9 +13,11 @@ It runs locally in the browser and currently supports caption capture on YouTube
   - `TS`: paragraph-style transcript text generated locally.
 - Click a caption line or sentence to jump to the matching video timestamp.
 - Highlight the currently playing caption while the video plays.
+- Include video title, author, URL, and description when exporting or sending transcripts.
 - Copy or download transcripts as `TXT`, `Markdown`, `SRT`, `WebVTT`, or `JSON`.
-- Save multiple prompt templates locally.
-- Send the current transcript to AI tools such as AI Studio, Gemini, ChatGPT, Claude, Grok, and NotebookLM.
+- Save multiple prompt templates locally, with autosave and template copying.
+- Use built-in summary presets: `Summary (bullet points)` and `Summary (article)`.
+- Send the current transcript to AI tools such as ChatGPT, Claude, AI Studio, Gemini, NotebookLM, and Grok.
 
 ## Installation
 
@@ -67,11 +69,11 @@ Caption capture:
 
 Prompt destinations:
 
+- ChatGPT
+- Claude
 - Google AI Studio
 - Gemini
 - NotebookLM
-- ChatGPT
-- Claude
 - Grok
 
 ## Privacy

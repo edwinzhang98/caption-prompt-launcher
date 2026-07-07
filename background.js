@@ -137,6 +137,7 @@ async function storeCaptionTrack(tabId, frameId, track) {
     frameId: frameId ?? 0,
     text: String(track.text).slice(0, 750_000),
     plainText: String(track.plainText || '').slice(0, 750_000),
+    videoInfo: normalizeVideoInfo(track.videoInfo || {}),
     cueCount: Array.isArray(track.cues) ? track.cues.length : Number(track.cueCount) || 0,
     cues: Array.isArray(track.cues)
       ? track.cues.slice(0, 6_000).map(cue => ({
@@ -159,6 +160,15 @@ async function storeCaptionTrack(tabId, frameId, track) {
   tracks.sort((a, b) => b.capturedAt - a.capturedAt);
   await chrome.storage.session.set({ [key]: tracks.slice(0, 10) });
   chrome.tabs.sendMessage(tabId, { type: 'CAPTION_TRACKS_UPDATED' }).catch(() => {});
+}
+
+function normalizeVideoInfo(info) {
+  return {
+    title: String(info.title || '').slice(0, 500),
+    author: String(info.author || '').slice(0, 300),
+    url: String(info.url || '').slice(0, 2_000),
+    description: String(info.description || '').slice(0, 12_000)
+  };
 }
 
 async function getCaptionTracks(tabId) {
@@ -204,13 +214,13 @@ async function scanCaptions(tabId) {
   try {
     await chrome.tabs.sendMessage(tabId, { type: 'SCAN_CAPTIONS' });
   } catch {
-    throw new Error('当前页面不支持字幕扫描，请刷新页面后重试。');
+    throw new Error('This page does not support caption scanning. Please refresh and try again.');
   }
 }
 
 async function createTask(payload) {
   if (!payload?.targetId || !payload?.text) {
-    throw new Error('发送任务内容不完整。');
+    throw new Error('Launch task payload is incomplete.');
   }
 
   const id = crypto.randomUUID();
@@ -233,7 +243,7 @@ async function createTask(payload) {
 
 async function downloadCaptionFile(payload) {
   if (!payload?.filename || !payload?.content) {
-    throw new Error('下载内容不完整。');
+    throw new Error('Download payload is incomplete.');
   }
   const mimeType = payload.mimeType || 'text/plain;charset=utf-8';
   const url = `data:${mimeType},${encodeURIComponent(payload.content)}`;

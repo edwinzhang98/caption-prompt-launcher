@@ -15,6 +15,10 @@
     parseYouTube
   } = globalThis.CaptionParsers;
   const { isExtensionContextError } = globalThis.CaptionPromptShared;
+  const {
+    collectVideoInfo,
+    compactVideoInfo
+  } = globalThis.CaptionPromptVideoInfo;
 
   function handleExtensionError(error) {
     if (!isExtensionContextError(error)) return false;
@@ -74,6 +78,7 @@
           plainText,
           pageUrl: location.href,
           pageTitle: document.title,
+          videoInfo: collectVideoInfo(track),
           frameUrl: location.href,
           capturedAt: Date.now()
         }
@@ -166,6 +171,7 @@
       if (!bvid && match) bvid = match[1];
 
       let title = document.title;
+      let videoInfo = {};
       if ((!aid || !cid) && bvid) {
         const view = await fetchResource(
           `https://api.bilibili.com/x/web-interface/view?bvid=${encodeURIComponent(bvid)}`,
@@ -174,6 +180,12 @@
         if (view?.code !== 0) return;
         aid = view.data.aid;
         title = view.data.title || title;
+        videoInfo = compactVideoInfo({
+          title: view.data.title,
+          author: view.data.owner?.name,
+          url: bvid ? `https://www.bilibili.com/video/${bvid}` : location.href,
+          description: view.data.desc
+        });
         const page = Number(url.searchParams.get('p')) || 1;
         cid = view.data.pages?.find(item => item.page === page)?.cid || view.data.cid;
       }
@@ -190,8 +202,8 @@
         sendRuntimeMessage({
           type: 'CAPTION_SCAN_STATUS',
           status: player?.data?.need_login_subtitle
-            ? '这条视频的字幕需要 Bilibili 登录状态，正在继续重试。'
-            : '这条视频暂时没有返回字幕。'
+            ? 'This video requires a Bilibili login for captions. Retrying...'
+            : 'This video has not returned captions yet.'
         }).catch(() => {});
         return;
       }
@@ -216,6 +228,9 @@
           label: subtitle.lan_doc || language,
           videoId: bvid || String(aid),
           title,
+          author: videoInfo.author,
+          description: videoInfo.description,
+          videoInfo,
           cues,
           text: cuesToText(cues)
         });

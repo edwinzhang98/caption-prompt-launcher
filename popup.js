@@ -7,13 +7,15 @@ const {
   withLaunchHash
 } = globalThis.CaptionPromptShared;
 const {
-  plainParagraphText
+  plainParagraphText,
+  textPackageWithVideoInfo
 } = globalThis.CaptionPromptTranscript;
 
 const elements = {
   prompt: document.querySelector('#prompt'),
   promptCount: document.querySelector('#promptCount'),
   templateList: document.querySelector('#templateList'),
+  copyTemplate: document.querySelector('#copyTemplate'),
   renameTemplate: document.querySelector('#renameTemplate'),
   deleteTemplate: document.querySelector('#deleteTemplate'),
   promptPosition: document.querySelector('#promptPosition'),
@@ -42,11 +44,11 @@ let selectedCaptionText = '';
 const transcriptCache = new WeakMap();
 
 function selectedTarget() {
-  return document.querySelector('input[name="target"]:checked')?.value || 'aistudio';
+  return document.querySelector('input[name="target"]:checked')?.value || 'chatgpt';
 }
 
 function updatePromptCount() {
-  elements.promptCount.textContent = `${elements.prompt.value.length} 字`;
+  elements.promptCount.textContent = `${elements.prompt.value.length} chars`;
 }
 
 function createTemplate(name, prompt = '') {
@@ -94,8 +96,8 @@ function renderTemplateList() {
   addButton.id = 'addTemplate';
   addButton.type = 'button';
   addButton.className = 'template-chip add-template-chip';
-  addButton.title = '添加模板';
-  addButton.setAttribute('aria-label', '添加模板');
+  addButton.title = 'Add template';
+  addButton.setAttribute('aria-label', 'Add template');
   addButton.textContent = '＋';
   addButton.addEventListener('click', addTemplate);
   elements.templateList.append(addButton);
@@ -116,11 +118,11 @@ function updateTargetUI() {
   const isNotebookLM = Boolean(target?.sourceOnly);
 
   elements.targetNote.textContent = isNotebookLM
-    ? 'NotebookLM 模式会复制纯字幕并打开网站。请新建 notebook，把字幕粘贴为 Copied text 来源；Prompt 模板仍保留供后续提问。'
+    ? 'NotebookLM mode copies the transcript and opens the site. Create a notebook and paste it as a Copied text source.'
     : '';
   elements.launch.querySelector('span').textContent = isNotebookLM
-    ? '复制字幕并打开 NotebookLM'
-    : '使用当前字幕并打开';
+    ? 'Copy Transcript and Open NotebookLM'
+    : 'Open with Current Transcript';
   elements.promptPosition.closest('.setting').classList.toggle('muted-setting', isNotebookLM);
   elements.autoSend.closest('.setting').classList.toggle('muted-setting', isNotebookLM);
 }
@@ -143,7 +145,7 @@ function sourceName(source) {
   return {
     youtube: 'YouTube',
     bilibili: 'Bilibili',
-    'html-track': '网页字幕'
+    'html-track': 'Page Captions'
   }[source] || source;
 }
 
@@ -157,7 +159,7 @@ function renderCaptionTracks() {
     elements.captionPreview.value = '';
     elements.copyCaption.disabled = true;
     elements.useCaption.disabled = true;
-    elements.captionStatus.textContent = '未发现字幕';
+    elements.captionStatus.textContent = 'No captions found';
     return;
   }
 
@@ -171,9 +173,9 @@ function renderCaptionTracks() {
     button.className = 'caption-track';
     button.classList.toggle('active', track.id === selectedCaptionId);
     button.innerHTML = `<strong></strong><span></span>`;
-    button.querySelector('strong').textContent = track.label || track.language || '字幕';
+    button.querySelector('strong').textContent = track.label || track.language || 'Captions';
     button.querySelector('span').textContent =
-      `${sourceName(track.source)} · ${track.cueCount || 0} 条`;
+      `${sourceName(track.source)} · ${track.cueCount || 0} cues`;
     button.addEventListener('click', () => {
       selectedCaptionId = track.id;
       renderCaptionTracks();
@@ -187,7 +189,7 @@ function renderCaptionTracks() {
   elements.copyCaption.disabled = !selectedCaptionText;
   elements.useCaption.disabled = !selectedCaptionText;
   elements.captionStatus.textContent =
-    `已捕获 ${captionTracks.length} 个字幕轨道`;
+    `Captured ${captionTracks.length} caption track${captionTracks.length === 1 ? '' : 's'}`;
 }
 
 async function loadCaptionTracks(triggerScan = false) {
@@ -198,7 +200,7 @@ async function loadCaptionTracks(triggerScan = false) {
   if (!activeTabId) return;
 
   if (triggerScan) {
-    elements.captionStatus.textContent = '正在扫描当前页面…';
+    elements.captionStatus.textContent = 'Scanning current page...';
     await chrome.runtime.sendMessage({ type: 'SCAN_CAPTIONS', tabId: activeTabId });
   }
 
@@ -219,7 +221,7 @@ async function scanAndPoll() {
       if (captionTracks.length) break;
     }
   } catch (error) {
-    elements.captionStatus.textContent = error.message || '扫描失败';
+    elements.captionStatus.textContent = error.message || 'Scan failed';
   }
 }
 
@@ -239,7 +241,7 @@ async function saveSettings() {
 function queueSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    saveSettings().catch(() => showMessage('设置保存失败，请重试。'));
+    saveSettings().catch(() => showMessage('Failed to save settings. Please try again.'));
   }, 180);
 }
 
@@ -260,7 +262,7 @@ async function loadSettings() {
   elements.promptPosition.value = launcherSettings.promptPosition || 'before';
   elements.autoSend.checked = Boolean(launcherSettings.autoSend);
 
-  const target = launcherSettings.target || 'aistudio';
+  const target = launcherSettings.target || 'chatgpt';
   const targetInput = document.querySelector(`input[name="target"][value="${target}"]`);
   if (targetInput) targetInput.checked = true;
 
@@ -273,6 +275,15 @@ function transcriptText(track) {
   return plainParagraphText(track, transcriptCache).trim();
 }
 
+function selectedCaptionPayloadText(bodyLabel = 'Transcript') {
+  const selectedTrack = captionTracks.find(track => track.id === selectedCaptionId);
+  if (!selectedTrack) return selectedCaptionText.trim();
+  return textPackageWithVideoInfo(selectedTrack, selectedCaptionText, {
+    cache: transcriptCache,
+    bodyLabel
+  });
+}
+
 async function launch() {
   showMessage('');
   elements.launch.disabled = true;
@@ -280,18 +291,20 @@ async function launch() {
   try {
     const captions = selectedCaptionText;
     if (!captions.trim()) {
-      throw new Error('没有可用字幕。请先在当前页面获取并选择一个字幕轨道。');
+      throw new Error('No captions available. Capture and select a caption track first.');
     }
+    const payloadText = selectedCaptionPayloadText();
 
     const targetId = selectedTarget();
     const target = TARGETS[targetId];
     let launchUrl = target.url;
     const text = target.sourceOnly
-      ? captions.trim()
+      ? payloadText
       : composeText(
           elements.prompt.value,
-          captions,
-          elements.promptPosition.value
+          payloadText,
+          elements.promptPosition.value,
+          { contentLabel: false }
         );
 
     await saveSettings();
@@ -309,16 +322,16 @@ async function launch() {
       });
 
       if (!response?.ok) {
-        throw new Error(response?.error || '无法创建发送任务。');
+        throw new Error(response?.error || 'Failed to create launch task.');
       }
       launchUrl = withLaunchHash(target.url, response.launchId);
     }
 
     await chrome.tabs.create({ url: launchUrl });
-    showMessage(`正在打开 ${target.label}…`, true);
+    showMessage(`Opening ${target.label}...`, true);
     setTimeout(() => window.close(), 350);
   } catch (error) {
-    showMessage(error.message || '操作失败，请重试。');
+    showMessage(error.message || 'Operation failed. Please try again.');
     elements.launch.disabled = false;
   }
 }
@@ -328,19 +341,31 @@ elements.prompt.addEventListener('input', () => {
   updatePromptCount();
   queueSave();
 });
+
 function addTemplate() {
   syncActiveTemplateFromEditor();
-  const template = createTemplate(`模板 ${templates.length + 1}`);
+  const template = createTemplate(`Template ${templates.length + 1}`);
   templates.push(template);
   activeTemplateId = template.id;
   displayActiveTemplate();
   elements.prompt.focus();
   queueSave();
 }
+
+elements.copyTemplate.addEventListener('click', async () => {
+  syncActiveTemplateFromEditor();
+  try {
+    await navigator.clipboard.writeText(elements.prompt.value);
+    showMessage('Template copied.', true);
+  } catch {
+    showMessage('Copy failed. Please check clipboard permission.');
+  }
+});
 elements.renameTemplate.addEventListener('click', () => {
+  syncActiveTemplateFromEditor();
   const template = activeTemplate();
   if (!template) return;
-  const name = window.prompt('模板名称', template.name)?.trim();
+  const name = window.prompt('Template name', template.name)?.trim();
   if (!name) return;
   template.name = name;
   renderTemplateList();
@@ -349,7 +374,7 @@ elements.renameTemplate.addEventListener('click', () => {
 elements.deleteTemplate.addEventListener('click', () => {
   if (templates.length <= 1) return;
   const template = activeTemplate();
-  if (!template || !window.confirm(`删除“${template.name}”？`)) return;
+  if (!template || !window.confirm(`Delete "${template.name}"?`)) return;
   const index = templates.findIndex(item => item.id === template.id);
   templates.splice(index, 1);
   activeTemplateId = templates[Math.max(0, index - 1)].id;
@@ -371,13 +396,13 @@ document.querySelectorAll('.view-tab').forEach(button => {
 elements.refreshCaptions.addEventListener('click', scanAndPoll);
 elements.copyCaption.addEventListener('click', async () => {
   if (!selectedCaptionText) return;
-  await navigator.clipboard.writeText(selectedCaptionText);
-  elements.captionStatus.textContent = '字幕已复制到剪贴板';
+  await navigator.clipboard.writeText(selectedCaptionPayloadText());
+  elements.captionStatus.textContent = 'Copied to clipboard';
 });
 elements.useCaption.addEventListener('click', () => {
   if (!selectedCaptionText) return;
   switchView('launcher');
-  showMessage('已选择当前字幕轨道，发送时会使用它的纯文本内容。', true);
+  showMessage('Selected current caption track. Sending will include video info and transcript text.', true);
 });
 
 loadSettings().catch(() => {
@@ -385,7 +410,7 @@ loadSettings().catch(() => {
   activeTemplateId = templates[0].id;
   displayActiveTemplate();
   updateTargetUI();
-  showMessage('未能载入旧设置，已使用默认值。');
+  showMessage('Failed to load old settings. Defaults are being used.');
 });
 
 scanAndPoll();
