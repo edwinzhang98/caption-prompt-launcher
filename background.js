@@ -75,13 +75,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message?.type === 'DOWNLOAD_CAPTION_FILE') {
-    downloadCaptionFile(message.payload)
-      .then(result => sendResponse({ ok: true, ...result }))
-      .catch(error => sendResponse({ ok: false, error: error.message }));
-    return true;
-  }
-
   if (message?.type === 'CLAIM_LAUNCH_TASK') {
     claimTask(message.targetId, message.launchId)
       .then(task => sendResponse({ ok: true, task }))
@@ -239,33 +232,6 @@ async function createTask(payload) {
     }
   });
   return id;
-}
-
-async function downloadCaptionFile(payload) {
-  if (!payload?.filename || !payload?.content) {
-    throw new Error('Download payload is incomplete.');
-  }
-  const mimeType = payload.mimeType || 'text/plain;charset=utf-8';
-  const url = `data:${mimeType},${encodeURIComponent(payload.content)}`;
-  const downloadId = await chrome.downloads.download({
-    url,
-    filename: sanitizeDownloadPath(payload.filename),
-    saveAs: Boolean(payload.saveAs),
-    conflictAction: 'uniquify'
-  });
-  const [item] = await chrome.downloads.search({ id: downloadId }).catch(() => []);
-  return {
-    downloadId,
-    filename: item?.filename || payload.filename
-  };
-}
-
-function sanitizeDownloadPath(value) {
-  return String(value || 'captions.txt')
-    .replace(/\\/g, '/')
-    .split('/')
-    .map(part => part.replace(/[<>:"|?*\u0000-\u001f]/g, '_').trim() || 'captions')
-    .join('/');
 }
 
 async function claimTask(targetId, launchId) {
