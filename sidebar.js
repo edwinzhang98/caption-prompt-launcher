@@ -667,6 +667,29 @@
     return tracks.find(track => track.id === selectedTrackId);
   }
 
+  function currentPageVideoKey() {
+    try {
+      const url = new URL(location.href);
+      if (url.hostname.endsWith('youtube.com') && url.pathname === '/watch') {
+        const videoId = url.searchParams.get('v');
+        return videoId ? { source: 'youtube', videoId } : null;
+      }
+      if (url.hostname.endsWith('bilibili.com')) {
+        const bvid = url.pathname.match(/\/video\/(BV[\w]+)/i)?.[1] || url.searchParams.get('bvid');
+        return bvid ? { source: 'bilibili', videoId: bvid } : null;
+      }
+    } catch {}
+    return null;
+  }
+
+  function trackMatchesCurrentVideo(track) {
+    const key = currentPageVideoKey();
+    if (!key) return true; // 非视频页 / 认不出视频 id 时不拦截
+    if (track.source && track.source !== key.source) return false;
+    if (String(track.videoId || '') === key.videoId) return true;
+    return String(track.id || '').includes(key.videoId);
+  }
+
   function selectedExportTrack() {
     const track = selectedTrack();
     if (!track) return undefined;
@@ -1290,9 +1313,23 @@
   async function launch() {
     syncActiveTemplateFromEditor();
     elements.launchMessage.classList.remove('success');
+
+    // 切视频后可能存在“面板已刷新、但内存里的 tracks 还没同步”的时序缝隙，
+    // 发送前强制按当前 URL 重新拉一次最新字幕，避免组出上一个视频的旧文本。
+    await loadTracks();
+    if (extensionContextInvalid) return;
+
+    const track = selectedExportTrack();
+    // 兜底：确认选中的字幕确实属于当前正在看的视频，不匹配就不粘旧的。
+    if (!track || !trackMatchesCurrentVideo(track)) {
+      elements.launchMessage.textContent = track
+        ? '字幕正在为当前视频加载，请稍候再试。'
+        : 'No captions available yet.';
+      return;
+    }
+
     const transcript = currentTranscriptText();
     const captions = currentPromptPayloadText();
-    const track = selectedExportTrack();
     if (!transcript) {
       elements.launchMessage.textContent = 'No captions available yet.';
       return;
@@ -1323,7 +1360,20 @@
       });
       if (extensionContextInvalid) return;
       if (!opened?.ok) throw new Error(opened?.error || 'Failed to open target site.');
-      elements.launchMessage.textContent = `Opening ${target.label}...`;
+      // 诊断：直接把关键值显示在面板状态行（无需开控制台）。
+      // 页面id vs 轨道id 是否一致、以及“发送内容开头”是不是当前视频，一眼可辨。
+      const pageKey = currentPageVideoKey();
+      const textHead = String(captions || '').replace(/\s+/g, ' ').trim().slice(0, 50);
+      const diagText =
+        `发送到 ${target.label}｜页面id=${pageKey?.videoId || '?'}｜轨道=${track.id || '?'}｜内容开头:「${textHead}…」`;
+      console.log('[caption-prompt] launch', {
+        pageVideoId: pageKey?.videoId || '',
+        trackVideoId: track.videoId || '',
+        trackId: track.id || '',
+        textHead
+      });
+      elements.launchMessage.textContent = diagText;
+      elements.launchMessage.title = diagText; // 鼠标悬停可看完整
     } catch (error) {
       if (handleExtensionError(error)) return;
       elements.launchMessage.textContent = error.message || 'Operation failed.';

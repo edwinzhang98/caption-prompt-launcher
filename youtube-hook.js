@@ -124,5 +124,9 @@
   scanPageState();
   setTimeout(scanPageState, 1000);
   setTimeout(scanPageState, 3000);
-  window.addEventListener('yt-navigate-finish', scanPageState);
+  window.addEventListener('yt-navigate-finish', () => {
+    // 切视频时清空按 URL 去重的集合，让（尤其是重访的）视频字幕能被重新发出。
+    seenTracks.clear();
+    scanPageState();
+  });
 })();

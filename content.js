@@ -161,34 +161,45 @@ function isUsableEditor(element) {
 
 async function fillEditor(editor, text) {
   const expected = probeText(text);
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  // 反复“填入 → 稍等 → 复核”，直到内容稳定停留。
+  // 目的：对抗 ChatGPT 页面加载后【异步恢复上一条旧草稿】——它可能在我们填完之后
+  // 才把旧草稿盖回来。insertText 每次都会先全选删除再填，所以重填能覆盖掉草稿。
+  for (let attempt = 0; attempt < 6; attempt += 1) {
     insertText(editor, text);
-    await sleep(350);
-    if (editorContains(editor, expected)) {
-      await sleep(550);
-      return editorContains(editor, expected);
-    }
+    await sleep(400);
+    if (!editorContains(editor, expected)) continue; // 没填进去，重来
+    // 已填进去，再多等一会儿，看是否被草稿恢复覆盖
+    await sleep(700);
+    if (editorContains(editor, expected)) return true; // 稳住了
+    // 被覆盖回旧草稿 → 进入下一轮，清空重填
   }
   forceSetText(editor, text);
-  await sleep(350);
+  await sleep(400);
   return editorContains(editor, expected);
 }
 
 function insertText(editor, text) {
   editor.focus();
 
-  if (dispatchPaste(editor, text) && editorContains(editor, probeText(text))) return;
-
+  // textarea / input：直接设值最稳
   if (editor instanceof HTMLTextAreaElement || editor instanceof HTMLInputElement) {
     setInputValue(editor, text);
     return;
   }
 
+  // contenteditable（ChatGPT 的 ProseMirror 等）：
+  // 优先用 execCommand insertText 走浏览器原生输入（相当于“模拟打字”），
+  // 文本会内联插入——既不会触发 ChatGPT 把长粘贴转成附件，
+  // 也不会像“合成粘贴 / 直接改 DOM”那样被编辑器回滚清空（就是那种闪一下又消失）。
   clearEditable(editor);
-  if (document.execCommand('insertText', false, text)) {
+  if (document.execCommand('insertText', false, text) && editorContains(editor, probeText(text))) {
     return;
   }
 
+  // 兜底一：合成粘贴事件
+  if (dispatchPaste(editor, text) && editorContains(editor, probeText(text))) return;
+
+  // 兜底二：直接写 DOM
   forceSetText(editor, text);
 }
 
@@ -221,13 +232,15 @@ function dispatchPaste(editor, text) {
 }
 
 function clearEditable(editor) {
-  editor.textContent = '';
+  // 全选现有内容后用 execCommand 删除。ChatGPT 的 ProseMirror 会把这当成真实输入处理，
+  // 从而真正清掉它自动恢复的“上一条旧草稿”；直接改 textContent 会被编辑器回滚、草稿又冒回来。
+  editor.focus();
   const selection = window.getSelection();
   const range = document.createRange();
   range.selectNodeContents(editor);
-  range.collapse(false);
   selection.removeAllRanges();
   selection.addRange(range);
+  document.execCommand('delete', false);
 }
 
 function forceSetText(editor, text) {

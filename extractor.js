@@ -43,8 +43,9 @@
       const lang = parsed.searchParams.get('tlang') ||
         parsed.searchParams.get('lang') ||
         'unknown';
+      // videoId 只信字幕 URL 自身携带的 v，不回退到 location.href——
+      // 否则旧视频的字幕文本会被贴上当前（新）视频的 id，骗过所有 videoId 校验。
       const videoId = parsed.searchParams.get('v') ||
-        new URL(location.href).searchParams.get('v') ||
         location.pathname.match(/\/embed\/([^/?]+)/)?.[1] ||
         '';
       const variant = parsed.searchParams.get('kind') || 'standard';
@@ -111,6 +112,8 @@
     const cues = parseYouTube(text);
     if (!cues.length) return;
     const meta = parseYouTubeMeta(url, fallbackLabel);
+    // 无法确定字幕归属哪个视频时宁可丢弃，避免旧字幕被误当作当前视频入库。
+    if (!meta.videoId) return;
     await publishTrack({
       id: `youtube:${meta.videoId}:${meta.lang}:${meta.variant}`,
       source: 'youtube',
@@ -286,6 +289,7 @@
 
   function clearPageCaptionCache() {
     processedUrls.clear();
+    processedBilibiliPages.clear();
     sendRuntimeMessage({ type: 'CLEAR_CAPTION_TRACKS' }).catch(() => {});
   }
 

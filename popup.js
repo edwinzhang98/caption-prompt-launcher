@@ -289,6 +289,9 @@ async function launch() {
   elements.launch.disabled = true;
 
   try {
+    // 切视频后 popup 里的 selectedCaptionText 还是上次渲染的旧快照——
+    // 发送前先按当前标签页的视频重新拉取并重算，避免发出上一个视频的字幕。
+    await loadCaptionTracks();
     const captions = selectedCaptionText;
     if (!captions.trim()) {
       throw new Error('No captions available. Capture and select a caption track first.');
